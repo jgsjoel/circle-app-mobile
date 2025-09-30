@@ -1,4 +1,5 @@
-# chat
+# Circle
+## the frontend for the circle chat app
 
 A new Flutter project.
 
