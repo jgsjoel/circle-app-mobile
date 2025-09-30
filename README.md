@@ -1,7 +1,16 @@
+<<<<<<< HEAD
 # Circle
 ## the frontend for the circle chat app
+=======
+>>>>>>> 8e4ceb2 (updated readme)
 
-A new Flutter project.
+# Circle
+
+## The frontend for the circle chat app
+
+![Status](https://img.shields.io/badge/status-in_progress-yellow)
+
+This project is still ongoing. 🚧
 
 ## Getting Started
 
