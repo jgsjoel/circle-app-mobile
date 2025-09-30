@@ -1,8 +1,3 @@
-<<<<<<< HEAD
-# Circle
-## the frontend for the circle chat app
-=======
->>>>>>> 8e4ceb2 (updated readme)
 
 # Circle
 
