@@ -1,0 +1,24 @@
+1. message table
+
+-> id(auto increment)
+-> message
+-> from_me
+-> chat_id
+-> status
+-> timestamp
+
+#######################
+2. chat_table
+
+-> id(auto increment)
+-> tmp_id
+-> public_chat_id
+-> is_group
+
+#######################
+3. chat_participants
+
+-> id(auto increment)
+-> chat_id(fk)
+-> contact_public_id(fk -> public_id col of the contact table)
+
