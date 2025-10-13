@@ -79,7 +79,7 @@ class LandingScreen extends StatelessWidget {
                 children: [
                   const SizedBox(height: 70),
                   const Text(
-                    "Welcome To EchoChat",
+                    "Welcome To Circle",
                     style: TextStyle(fontSize: 30, fontWeight: FontWeight.bold),
                   ),
                   SizedBox(height: MediaQuery.of(context).size.height / 8),

@@ -9,11 +9,12 @@ import 'package:chat/database/database_helper.dart';
 import 'package:chat/services/message_serivce.dart';
 import 'package:chat/services/profile_update_service.dart';
 import 'package:chat/services/secure_store_service.dart';
+import 'package:chat/services/webSock_service.dart';
 import 'package:get_it/get_it.dart';
 
 final getIt = GetIt.instance;
 
-void setupLocator() {
+Future<void> setupLocator() async {
   getIt.registerLazySingleton<AuthService>(() => AuthService());
   getIt.registerLazySingleton<ProfileUpdateService>(
     () => ProfileUpdateService(),
@@ -28,4 +29,6 @@ void setupLocator() {
   getIt.registerLazySingleton<MessageDao>(() => MessageDao());
   getIt.registerLazySingleton<ChatDao>(() => ChatDao());
   getIt.registerLazySingleton<ChatParticipantsDao>(() => ChatParticipantsDao());
+
+  getIt.registerLazySingleton<WebSocketService>(()=>WebSocketService());
 }
