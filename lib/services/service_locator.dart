@@ -1,6 +1,7 @@
 import 'package:chat/database/dao/chat_dao.dart';
 import 'package:chat/database/dao/chat_participant_dao.dart';
 import 'package:chat/database/dao/contact_dao.dart';
+import 'package:chat/database/dao/media_file_dao.dart';
 import 'package:chat/database/dao/message_dao.dart';
 import 'package:chat/services/auth_service.dart';
 import 'package:chat/services/chat_service.dart';
@@ -26,6 +27,7 @@ Future<void> setupLocator() async {
   getIt.registerLazySingleton<ChatService>(()=> ChatService());
 
   getIt.registerLazySingleton<ContactDao>(() => ContactDao());
+  getIt.registerLazySingleton<MediaFileDao>(() => MediaFileDao());
   getIt.registerLazySingleton<MessageDao>(() => MessageDao());
   getIt.registerLazySingleton<ChatDao>(() => ChatDao());
   getIt.registerLazySingleton<ChatParticipantsDao>(() => ChatParticipantsDao());

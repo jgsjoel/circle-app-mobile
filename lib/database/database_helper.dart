@@ -20,7 +20,7 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 1,
+      version: 2,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -69,18 +69,35 @@ class DatabaseHelper {
       )
     ''');
 
+    await db.execute('''
+      CREATE TABLE media_files(
+        id TEXT PRIMARY KEY,
+        url TEXT NOT NULL,
+        public_id TEXT NOT NULL,
+        message_id INTEGER NOT NULL,
+        FOREIGN KEY (message_id) REFERENCES message(id) ON DELETE CASCADE
+      )
+    ''');
+
     // Later, just add more tables here (message, user, etc.)
   }
 
   Future _onUpgrade(Database db, int oldVersion, int newVersion) async {
     if (oldVersion < 2) {
-      await db.execute('ALTER TABLE contact_list ADD COLUMN email TEXT;');
+      await db.execute('''
+      CREATE TABLE media_files(
+        id TEXT PRIMARY KEY,
+        url TEXT NOT NULL,
+        public_id TEXT NOT NULL,
+        message_id INTEGER NOT NULL,
+        FOREIGN KEY (message_id) REFERENCES message(id) ON DELETE CASCADE
+      )
+    ''');
     }
-    // Add more migrations for new tables or schema changes
   }
 
   Future close() async {
     final db = await database;
-    db.close(); 
+    db.close();
   }
 }

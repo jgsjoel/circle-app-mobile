@@ -24,7 +24,9 @@ class WebSocketService {
     try {
       print("🔌 Connecting to WebSocket: ");
       final url = "ws://192.168.1.5:8001/ws/chat?token=$token";
-      final socket = await WebSocket.connect(url);
+      final socket = await WebSocket.connect(
+        url
+        );
       _channel = IOWebSocketChannel(socket);
       _isConnected = true;
       _isManuallyClosed = false;

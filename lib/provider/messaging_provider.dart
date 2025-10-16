@@ -1,9 +1,13 @@
+import 'dart:convert';
+
 import 'package:chat/database/modals/chat_modal.dart';
 import 'package:chat/database/modals/message_modal.dart';
 import 'package:chat/dtos/chat_dto.dart';
 import 'package:chat/provider/chats_screen_provider.dart';
+import 'package:chat/provider/ws_provider.dart';
 import 'package:chat/services/chat_service.dart';
 import 'package:chat/services/message_serivce.dart';
+import 'package:chat/services/secure_store_service.dart';
 import 'package:chat/services/service_locator.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -17,6 +21,9 @@ class MessageNotifier extends StateNotifier<List<MessageModal>> {
 
   Future<void> loadMessages(String chatId) async {
     final messages = await _messageService.getMessagesByChatId(chatId);
+    print("chatId: $chatId");
+    int count = messages.length;
+    print("message count: $count");
     state = messages;
   }
 
@@ -85,9 +92,39 @@ class MessageNotifier extends StateNotifier<List<MessageModal>> {
       ref.read(chatScreenProvider.notifier).updateChat(updatedChat);
     }
 
+    sendToServer(messageModal,chatDto);
+
     // 6️⃣ Update messages state
     state = [...state, messageModal];
   }
+
+  Future<void> sendToServer(MessageModal messageModal, ChatDto chatDto, {List<Map<String, String>>? mediaList}) async {
+  final webSocketNotifier = ref.read(webSocketProvider.notifier);
+
+  // Ensure chat ID and receiver ID are resolved
+  final chatId = chatDto.id ?? "";
+  final receiverId = chatDto.publicUserId ?? "";
+  final senderId = await SecureStoreService.getPublicUserId();
+
+  final Map<String, dynamic> messageJson = {
+    "msg_type": "message",
+    "message": {
+      "message_id": messageModal.id,
+      "message": messageModal.message,
+      "chat_id": chatId,
+      "sender_id": senderId,
+      "receiver_id": receiverId,
+      "sender_timestamp": DateTime.now().toUtc().toIso8601String(),
+      "message_type": mediaList != null && mediaList.isNotEmpty ? "MEDIA" : "TEXT",
+      "media_list": mediaList ?? []
+    }
+  };
+
+  final String jsonString = jsonEncode(messageJson);
+  webSocketNotifier.send(jsonString);
+  print("📤 Sent message to server: $jsonString");
+}
+
 
   void clear() => state = [];
 }

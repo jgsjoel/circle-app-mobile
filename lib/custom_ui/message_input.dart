@@ -30,13 +30,13 @@ class _MessageInputState extends State<MessageInput> {
   bool isTyping = false;
 
   void _handleSend() {
-  final message = widget.controller.text.trim();
-  if (message.isNotEmpty) {
-    widget.onSend(message); // 👈 push to provider
-    widget.controller.clear();
-    setState(() => isTyping = false);
+    final message = widget.controller.text.trim();
+    if (message.isNotEmpty) {
+      widget.onSend(message);
+      widget.controller.clear();
+      setState(() => isTyping = false);
+    }
   }
-}
 
   @override
   Widget build(BuildContext context) {
