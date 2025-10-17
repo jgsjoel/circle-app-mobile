@@ -127,6 +127,27 @@ class MessageNotifier extends StateNotifier<List<MessageModal>> {
 
 
   void clear() => state = [];
+
+  /// Add an incoming message to the current chat's message list
+  void addIncomingMessage(MessageModal message) {
+    // Only add if the message belongs to the currently loaded chat
+    if (state.isNotEmpty && state.first.chatId == message.chatId) {
+      state = [...state, message];
+      print("📩 Added incoming message to current chat: ${message.message}");
+    } else {
+      print("📩 Incoming message for different chat: ${message.chatId}");
+    }
+  }
+
+  /// Check if a specific chat is currently being viewed
+  bool isChatCurrentlyViewed(String chatId) {
+    return state.isNotEmpty && state.first.chatId == chatId;
+  }
+
+  /// Get the currently loaded chat ID
+  String? getCurrentChatId() {
+    return state.isNotEmpty ? state.first.chatId : null;
+  }
 }
 
 final messageProvider =

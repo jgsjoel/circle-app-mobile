@@ -42,6 +42,36 @@ class ChatScreenNotifier extends StateNotifier<List<ChatDto>> {
       return bTime.compareTo(aTime);
     });
   }
+
+  /// Update chat with new incoming message
+  void updateChatWithNewMessage(String chatId, String lastMessage, String timestamp) {
+    final updatedList = [
+      for (final chat in state)
+        if (chat.id == chatId) 
+          chat.copyWith(
+            lastMessage: lastMessage,
+            time: timestamp,
+            messageCount: (chat.messageCount ?? 0) + 1,
+          )
+        else chat,
+    ];
+    _sortChatsByTime(updatedList);
+    state = updatedList;
+    print("📩 Updated chat list with new message for chat: $chatId");
+  }
+
+  /// Force refresh the chat list from database
+  Future<void> refreshChats() async {
+    print("🔄 Refreshing chat list from database");
+    await loadChats();
+  }
+
+  /// Remove a specific chat from the list
+  void removeChat(String chatId) {
+    final updatedList = state.where((chat) => chat.id != chatId).toList();
+    state = updatedList;
+    print("🗑️ Removed chat from list: $chatId");
+  }
 }
 
 // Provider for the notifier

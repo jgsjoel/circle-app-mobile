@@ -151,6 +151,24 @@ class _MessageScreenState extends ConsumerState<MessageScreen> {
                           messageProvider,
                         ); // <-- listen to provider
 
+                        // Auto-scroll to bottom when new messages arrive
+                        WidgetsBinding.instance.addPostFrameCallback((_) {
+                          if (_scrollController.hasClients &&
+                              _scrollController.positions.isNotEmpty) {
+                            // Only auto-scroll if user is near the bottom (within 100px)
+                            final position = _scrollController.position;
+                            final isNearBottom = position.maxScrollExtent - position.pixels < 100;
+                            
+                            if (isNearBottom) {
+                              _scrollController.animateTo(
+                                _scrollController.position.maxScrollExtent,
+                                duration: const Duration(milliseconds: 300),
+                                curve: Curves.easeOut,
+                              );
+                            }
+                          }
+                        });
+
                         return ListView.builder(
                           controller: _scrollController,
                           itemCount: messages.length,
@@ -170,7 +188,7 @@ class _MessageScreenState extends ConsumerState<MessageScreen> {
                                 }
                               },
 
-                              messageId: message.id!,
+                              messageId: message.id,
                               timeStamp: message.timestamp,
                             );
                           },

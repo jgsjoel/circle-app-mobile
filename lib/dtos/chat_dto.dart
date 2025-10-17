@@ -42,7 +42,7 @@ class ChatDto {
       name: name ?? this.name,
       isGroup: isGroup ?? this.isGroup,
       messageCount: messageCount ?? this.messageCount,
-      lastMessage: lastMessage,
+      lastMessage: lastMessage ?? this.lastMessage,
       icon: icon ?? this.icon,
       time: time ?? this.time,
       id: id ?? this.id,

@@ -34,7 +34,7 @@ class Chatstab extends ConsumerWidget {
                     chatDto: chat,
                     onDelete: () {
                       _chatService.deleteChat(chat.id!);
-                      ref.read(chatScreenProvider.notifier).loadChats();
+                      ref.read(chatScreenProvider.notifier).removeChat(chat.id!);
                     },
                   );
                 },

@@ -11,7 +11,7 @@ class ChatParticipantsDao {
         conflictAlgorithm: ConflictAlgorithm.replace);
   }
 
-  Future<List<ChatParticipantModal>> getParticipantsByChat(int chatId) async {
+  Future<List<ChatParticipantModal>> getParticipantsByChat(String chatId) async {
     final db = await DatabaseHelper().database;
     final result = await db.query(
       table,

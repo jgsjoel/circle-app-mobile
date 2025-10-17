@@ -106,4 +106,20 @@ class ChatDao {
     final db = await DatabaseHelper().database;
     return await db.delete(table, where: 'id = ?', whereArgs: [id]);
   }
+
+  /// Find existing chat between two participants (for 1-on-1 chats)
+  Future<ChatModal?> findChatBetweenParticipants(String participant1Id, String participant2Id) async {
+    final db = await DatabaseHelper().database;
+    final result = await db.rawQuery('''
+      SELECT c.* FROM chat_table c
+      INNER JOIN chat_participants p1 ON c.id = p1.chat_id
+      INNER JOIN chat_participants p2 ON c.id = p2.chat_id
+      WHERE p1.contact_public_id = ? 
+        AND p2.contact_public_id = ? 
+        AND c.is_group = 0
+      LIMIT 1
+    ''', [participant1Id, participant2Id]);
+    
+    return result.isNotEmpty ? ChatModal.fromMap(result.first) : null;
+  }
 }
