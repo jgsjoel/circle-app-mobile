@@ -1,4 +1,4 @@
-import 'package:chat/database/modals/contact_modal.dart';
+import 'package:chat/database/db_modals/contact_modal.dart';
 import 'package:chat/database/database_helper.dart';
 import 'package:chat/dtos/chat_dto.dart';
 import 'package:sqflite/sqflite.dart';

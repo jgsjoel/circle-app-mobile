@@ -1,7 +1,7 @@
 import 'package:chat/database/dao/chat_dao.dart';
 import 'package:chat/database/database_helper.dart';
-import 'package:chat/database/modals/chat_modal.dart';
-import 'package:chat/database/modals/message_modal.dart';
+import 'package:chat/database/db_modals/chat_modal.dart';
+import 'package:chat/database/db_modals/message_modal.dart';
 import 'package:chat/dtos/status_update_content.dart';
 import 'package:chat/services/service_locator.dart';
 import 'package:sqflite/sqflite.dart';

@@ -1,5 +1,5 @@
 import 'package:chat/database/dao/message_dao.dart';
-import 'package:chat/database/modals/message_modal.dart';
+import 'package:chat/database/db_modals/message_modal.dart';
 import 'package:chat/services/api_service.dart';
 import 'package:chat/services/service_locator.dart';
 

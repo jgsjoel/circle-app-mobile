@@ -1,6 +1,6 @@
 import 'dart:convert';
 
-import 'package:chat/database/modals/contact_modal.dart';
+import 'package:chat/database/db_modals/contact_modal.dart';
 import 'package:chat/services/api_service.dart';
 import 'package:chat/database/dao/contact_dao.dart';
 import 'package:chat/services/service_locator.dart';

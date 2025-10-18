@@ -2,6 +2,7 @@ import 'package:chat/custom_ui/bottom_sheet.dart';
 import 'package:chat/custom_ui/message_input.dart';
 import 'package:chat/custom_ui/message_bubble.dart';
 import 'package:chat/dtos/chat_dto.dart';
+import 'package:chat/models/media_selection.dart';
 import 'package:chat/provider/messaging_provider.dart';
 import 'package:chat/services/message_serivce.dart';
 import 'package:chat/services/service_locator.dart';
@@ -28,6 +29,42 @@ class _MessageScreenState extends ConsumerState<MessageScreen> {
     setState(() {
       _showAttachmentSheet = !_showAttachmentSheet;
     });
+  }
+
+  void _handleMediaSelected(List<MediaFile> mediaFiles) {
+    setState(() {
+      _showAttachmentSheet = false;
+    });
+    
+    // Handle the selected media files
+    for (final mediaFile in mediaFiles) {
+      print('Media file selected: ${mediaFile.file.path}');
+      // _sendMediaMessage(mediaFile);
+    }
+  }
+
+  void _sendMediaMessage(MediaFile mediaFile) {
+    // Here you would typically:
+    // 1. Upload the media file to your server
+    // 2. Get the URL/ID from the server
+    // 3. Send the message with media attachment
+    
+    // For now, we'll create a text message with media info
+    final mediaMessage = mediaFile.caption?.isNotEmpty == true 
+        ? mediaFile.caption! 
+        : 'Sent ${mediaFile.type.name}';
+    
+    // Send the message through the existing flow
+    ref.read(messageProvider.notifier).addMessage(mediaMessage, widget.chatDto);
+    
+    // Show success message
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('${mediaFile.type.name} sent successfully'),
+        backgroundColor: const Color(0xFF25D366),
+        duration: const Duration(seconds: 2),
+      ),
+    );
   }
 
   void _handleBack() {
@@ -230,7 +267,7 @@ class _MessageScreenState extends ConsumerState<MessageScreen> {
                   bottom: 65, // just above the message input
                   left: 0,
                   right: 0,
-                  child: CustomBottomSheet.buildInlineSheet(context),
+                  child: CustomBottomSheet.buildInlineSheet(context, _handleMediaSelected),
                 ),
             ],
           ),

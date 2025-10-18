@@ -1,7 +1,7 @@
 import 'package:chat/database/dao/chat_dao.dart';
 import 'package:chat/database/dao/chat_participant_dao.dart';
-import 'package:chat/database/modals/chat_modal.dart';
-import 'package:chat/database/modals/chat_participant_modal.dart';
+import 'package:chat/database/db_modals/chat_modal.dart';
+import 'package:chat/database/db_modals/chat_participant_modal.dart';
 import 'package:chat/dtos/chat_dto.dart';
 import 'package:chat/services/api_service.dart';
 import 'package:chat/services/secure_store_service.dart';

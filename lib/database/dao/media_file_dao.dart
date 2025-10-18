@@ -1,5 +1,5 @@
 import 'package:chat/database/database_helper.dart';
-import 'package:chat/database/modals/MediaFileModal.dart';
+import 'package:chat/database/db_modals/MediaFileModal.dart';
 import 'package:sqflite/sqflite.dart';
 
 class MediaFileDao {

@@ -1,7 +1,7 @@
 import 'dart:convert';
 
-import 'package:chat/database/modals/chat_modal.dart';
-import 'package:chat/database/modals/message_modal.dart';
+import 'package:chat/database/db_modals/chat_modal.dart';
+import 'package:chat/database/db_modals/message_modal.dart';
 import 'package:chat/dtos/chat_dto.dart';
 import 'package:chat/provider/chats_screen_provider.dart';
 import 'package:chat/provider/ws_provider.dart';
@@ -54,6 +54,10 @@ class MessageNotifier extends StateNotifier<List<MessageModal>> {
   //   // access chatScreenProvider and update state
   //   ref.read(chatScreenProvider.notifier).updateChat(updatedChat);
   // }
+
+  void addMediaMessage(String caption, ChatDto chatDto) async {
+    
+  }
 
   void addMessage(String text, ChatDto chatDto) async {
     final pubChatId = chatDto.pubChatId ?? '';

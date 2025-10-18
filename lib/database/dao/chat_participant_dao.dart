@@ -1,5 +1,5 @@
 import 'package:chat/database/database_helper.dart';
-import 'package:chat/database/modals/chat_participant_modal.dart';
+import 'package:chat/database/db_modals/chat_participant_modal.dart';
 import 'package:sqflite/sqflite.dart';
 
 class ChatParticipantsDao {
