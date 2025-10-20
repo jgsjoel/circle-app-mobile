@@ -29,7 +29,7 @@ Future<void> main() async {
     ),
   );
 
-  setupLocator();
+  await setupLocator();
 
   await getIt<DatabaseHelper>().database;
 

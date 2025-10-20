@@ -16,15 +16,30 @@ class LandingScreen extends StatelessWidget {
       final sdkInt = androidInfo.version.sdkInt;
 
       if (sdkInt >= 33) {
-        // Android 13+ → request Photos (READ_MEDIA_IMAGES)
-        mediaStatus = await Permission.photos.request();
+        // Android 13+ → request Photos, Videos, Audio
+        final statusImages = await Permission.photos.request();
+        final statusVideos = await Permission.videos.request();
+        final statusAudio = await Permission.audio.request();
+
+        mediaStatus =
+            (statusImages.isGranted &&
+                    statusVideos.isGranted &&
+                    statusAudio.isGranted)
+                ? PermissionStatus.granted
+                : PermissionStatus.denied;
       } else {
         // Android < 13 → request Storage
         mediaStatus = await Permission.storage.request();
       }
     } else {
-      // iOS → request Photos
-      mediaStatus = await Permission.photos.request();
+      // iOS → request Photos, Videos
+      final statusImages = await Permission.photos.request();
+      final statusVideos = await Permission.videos.request();
+
+      mediaStatus =
+          (statusImages.isGranted && statusVideos.isGranted)
+              ? PermissionStatus.granted
+              : PermissionStatus.denied;
     }
 
     if (contactsStatus.isGranted && mediaStatus.isGranted) {

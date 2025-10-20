@@ -1,3 +1,5 @@
+import 'package:chat/database/db_modals/MediaFileModal.dart';
+
 class MessageModal {
   int? id;
   final String? msgPubId;
@@ -6,6 +8,7 @@ class MessageModal {
   final String chatId;
   final String? status;
   final int timestamp;
+  final List<MediaFile> mediaFiles; // ✅ new
 
   MessageModal({
     this.id,
@@ -15,6 +18,7 @@ class MessageModal {
     required this.chatId,
     this.status,
     required this.timestamp,
+    this.mediaFiles = const [],
   });
 
   Map<String, dynamic> toMap() {
@@ -26,6 +30,7 @@ class MessageModal {
       'chat_id': chatId,
       'status': status,
       'timestamp': timestamp,
+      'mediaFiles': mediaFiles.map((e) => e.toMap()).toList(),
     };
   }
 
@@ -38,6 +43,10 @@ class MessageModal {
       chatId: map['chat_id'] as String,
       status: map['status'] as String?,
       timestamp: map['timestamp'] as int,
+      mediaFiles: (map['mediaFiles'] as List<dynamic>?)
+              ?.map((e) => MediaFile.fromMap(e))
+              .toList() ??
+          [],
     );
   }
 }

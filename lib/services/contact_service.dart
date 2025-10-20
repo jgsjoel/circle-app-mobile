@@ -1,15 +1,16 @@
 import 'dart:convert';
 
+import 'package:chat/database/collections/contact.dart';
 import 'package:chat/database/db_modals/contact_modal.dart';
+import 'package:chat/database/isar_dao/contact_isar_dao.dart';
 import 'package:chat/services/api_service.dart';
-import 'package:chat/database/dao/contact_dao.dart';
 import 'package:chat/services/service_locator.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_contacts/flutter_contacts.dart';
 
 class ContactService {
-  final ContactDao _contactDao = getIt<ContactDao>();
+  final ContactIsarDao _contactIsarDao = getIt<ContactIsarDao>();
   final _dio = ApiService.instance.dio;
 
   Future<void> syncContacts() async {
@@ -20,7 +21,8 @@ class ContactService {
     List<ContactModal> contactList = _sanitizeContacts(contacts);
 
     //get all local db contacts
-    List<ContactModal> localContacts = await _contactDao.getAllContacts();
+    final localContactsCollection = await _contactIsarDao.getAllContacts();
+    List<ContactModal> localContacts = localContactsCollection.map((contact)=>contact.toModel()).toList();
 
     //if not available then send to server and save the returned ones
     if (localContacts.isEmpty) {
@@ -75,7 +77,7 @@ class ContactService {
           pubContactId: localEntry.pubContactId,
         );
 
-        await _contactDao.updateContact(updatedContact);
+        await _contactIsarDao.updateContactByPublicId(ContactCollection.fromModel(updatedContact).publicId, name: updatedContact.name);
       }
     }
   }
@@ -130,7 +132,7 @@ class ContactService {
 
       // Save to local database
       for (var contact in returnedContacts) {
-        await _contactDao.insertContact(contact);
+        await _contactIsarDao.saveContact(ContactCollection.fromModel(contact));
       }
     } on DioException catch (e) {
       print("----------Here---------");
