@@ -2,6 +2,7 @@ import 'package:chat/database/db_modals/MediaFileModal.dart';
 
 class MessageModal {
   int? id;
+  final String? messageId;
   final String? msgPubId;
   final String message;
   final bool fromMe;
@@ -12,6 +13,7 @@ class MessageModal {
 
   MessageModal({
     this.id,
+    this.messageId,
     this.msgPubId,
     required this.message,
     required this.fromMe,
@@ -24,6 +26,7 @@ class MessageModal {
   Map<String, dynamic> toMap() {
     return {
       'id': id,
+      'message_id': messageId,
       'msg_pub_id': msgPubId,
       'message': message,
       'from_me': fromMe ? 1 : 0,
@@ -37,6 +40,7 @@ class MessageModal {
   factory MessageModal.fromMap(Map<String, dynamic> map) {
     return MessageModal(
       id: map['id'] as int?,
+      messageId: map['message_id'] as String?,
       msgPubId: map['msg_pub_id'] as String?,
       message: map['message'] as String,
       fromMe: (map['from_me'] as int) == 1,

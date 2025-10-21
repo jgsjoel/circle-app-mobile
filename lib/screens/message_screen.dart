@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:chat/custom_ui/bottom_sheet.dart';
 import 'package:chat/custom_ui/message_bubble.dart';
 import 'package:chat/custom_ui/message_input.dart';
@@ -11,24 +12,30 @@ import 'package:chat/screens/media_view.dart';
 import 'package:chat/services/secure_store_service.dart';
 import 'package:chat/services/service_locator.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:isar/isar.dart';
 import 'package:chat/database/collections/chat.dart';
 import 'package:chat/database/collections/message.dart';
+import 'package:uuid/uuid.dart';
+import 'package:chat/provider/ws_provider.dart';
 
-class MessageScreen extends StatefulWidget {
+// Changed to ConsumerStatefulWidget
+class MessageScreen extends ConsumerStatefulWidget {
   final ChatDto chatDto;
   const MessageScreen({super.key, required this.chatDto});
 
   @override
-  State<MessageScreen> createState() => _MessageScreenState();
+  ConsumerState<MessageScreen> createState() => _MessageScreenState();
 }
 
-class _MessageScreenState extends State<MessageScreen> {
+// Changed state to ConsumerState
+class _MessageScreenState extends ConsumerState<MessageScreen> {
   final TextEditingController _controller = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final Isar _isar = getIt<Isar>();
-  // final MessageService _messageService = getIt<MessageService>();
   final FocusNode _focusNode = FocusNode();
+  final _uuid = const Uuid();
+
   bool _emojiShowing = false;
   bool _showAttachmentSheet = false;
 
@@ -42,22 +49,50 @@ class _MessageScreenState extends State<MessageScreen> {
     _messageStream =
         _messageDao.watchMessages(widget.chatDto.id!).asBroadcastStream();
 
+    _messageDao.markMessagesAsRead(widget.chatDto.id!);
+
     _focusNode.addListener(() {
       if (_focusNode.hasFocus) setState(() => _emojiShowing = false);
     });
+  }
+
+  // 💡 Helper to build the server-expected payload structure
+  Map<String, dynamic> _buildMessageDtoPayload({
+    required MessageModal message,
+    required String senderPublicId,
+    required String receiverPublicId,
+    required String contentType, // Renamed for clarity: TEXT or MEDIA
+  }) {
+    // 1. Map MediaFileModal to MediaDto structure (snake_case)
+    final mediaList = message.mediaFiles
+        .map((m) => {"url": m.url, "public_id": m.publicId})
+        .toList();
+
+    // 2. Construct the core MessageDto structure (snake_case)
+    final messageDto = {
+      "message_id": message.msgPubId,
+      "message": message.message,
+      "chat_id": widget.chatDto.id,
+      "sender_id": senderPublicId,
+      "receiver_id": receiverPublicId,
+      "sender_timestamp": message.timestamp.toString(), // Server expects String
+      "message_type":
+          contentType, // The actual type of the message content (TEXT/MEDIA)
+      "media_list":
+          mediaList.isNotEmpty ? mediaList : null, // Use null if empty
+    };
+
+    // 3. Wrap in the standard WebSocket envelope (InComingMsgStruct format)
+    return {
+      "msg_type": "message",
+      "message": messageDto, // 👈 FIX: Send the DTO object directly, not an array.
+    };
   }
 
   void _toggleAttachmentSheet() {
     setState(() {
       _showAttachmentSheet = !_showAttachmentSheet;
     });
-  }
-
-  void _sendMessage(String text) async {
-    if (text.trim().isEmpty) return;
-    await _messageDao.saveMessage(widget.chatDto.id!, text, fromMe: true);
-    _controller.clear();
-    _scrollToBottom();
   }
 
   void _scrollToBottom() {
@@ -90,13 +125,14 @@ class _MessageScreenState extends State<MessageScreen> {
       setState(() => _emojiShowing = false);
     } else {
       FocusScope.of(context).unfocus();
-      Future.delayed(Duration(milliseconds: 100), () {
+      Future.delayed(const Duration(milliseconds: 100), () {
         setState(() => _emojiShowing = true);
       });
     }
   }
 
   Future<MessageModal> addMessageLocally(String text, ChatDto chatDto) async {
+    // ... (unchanged: logic to find/create chat, included for context)
     ChatCollection? chat =
         await _isar.chatCollections
             .filter()
@@ -153,9 +189,11 @@ class _MessageScreenState extends State<MessageScreen> {
     // 2️⃣ Create the message
     final message =
         MessageCollection()
+          ..msgPubId = _uuid.v4()
           ..message = text
           ..fromMe = true
           ..timestamp = DateTime.now().millisecondsSinceEpoch
+          ..status = 'sending'
           ..chat.value = chat; // one-to-one link
 
     // 3️⃣ Save the message and update the chat link
@@ -175,12 +213,22 @@ class _MessageScreenState extends State<MessageScreen> {
     return message.toModel();
   }
 
+  // 💡 Updated _handleMediaSelected to use the new payload structure
   void _handleMediaSelected(List<MediaFile> mediaFiles, ChatDto chatDto) async {
     setState(() {
       _showAttachmentSheet = false;
     });
 
-    // 1️⃣ Make sure the chat exists (or create it along with participants)
+    // 1️⃣ Prepare participant IDs and check for valid receiver
+    final myPublicId = await SecureStoreService.getPublicUserId();
+    final receiverPublicId = widget.chatDto.publicUserId;
+
+    if (receiverPublicId == null) {
+      print("Error: Cannot send message, receiver ID is missing.");
+      return;
+    }
+
+    // 2️⃣ (unchanged: logic to find/create chat)
     ChatCollection? chat =
         await _isar.chatCollections
             .filter()
@@ -188,6 +236,7 @@ class _MessageScreenState extends State<MessageScreen> {
             .findFirst();
 
     if (chat == null) {
+      // Chat creation logic here
       chat =
           ChatCollection()
             ..id =
@@ -198,13 +247,10 @@ class _MessageScreenState extends State<MessageScreen> {
             ..lastUpdated = DateTime.now();
 
       await _isar.writeTxn(() async {
-        // Save chat first
         await _isar.chatCollections.put(chat!);
 
-        // Create participant objects
         final participantCollections = <ChatParticipantCollection>[];
 
-        // Other user
         if (chatDto.publicUserId != null) {
           final otherParticipant =
               ChatParticipantCollection()
@@ -213,50 +259,49 @@ class _MessageScreenState extends State<MessageScreen> {
           participantCollections.add(otherParticipant);
         }
 
-        // Myself
-        final myPublicId = await SecureStoreService.getPublicUserId();
         final meParticipant =
             ChatParticipantCollection()
               ..contactPublicId = myPublicId
               ..chat.value = chat;
         participantCollections.add(meParticipant);
 
-        // Save participants and persist links
         await _isar.chatParticipantCollections.putAll(participantCollections);
         for (final participant in participantCollections) {
           await participant.chat.save();
         }
 
-        // Link participants to chat
         chat.participants.addAll(participantCollections);
         await chat.participants.save();
       });
     }
 
-    // 2️⃣ Create a message (one message per media group)
+    // 3️⃣ Create a message (one message per media group)
+    final publicMessageId = _uuid.v4();
     final message =
         MessageCollection()
-          ..message =
-              mediaFiles.first.caption ??
-              '' // optional caption
+          ..msgPubId = publicMessageId
+          ..message = mediaFiles.first.caption ?? ''
           ..fromMe = true
           ..timestamp = DateTime.now().millisecondsSinceEpoch
+          ..status = 'sending'
           ..chat.value = chat;
 
-    // 3️⃣ Create MediaFileCollections and link them to the message
+    // 4️⃣ Create MediaFileCollections and link them to the message
     final mediaCollections =
         mediaFiles.map((mediaFile) {
           final media =
               MediaFileCollection()
                 ..id = mediaFile.name
-                ..url = mediaFile.file.path
-                ..publicId =
-                    '' // will update after upload
+                ..url =
+                    mediaFile
+                        .file
+                        .path // local path
+                ..publicId = ''
                 ..message.value = message;
           return media;
         }).toList();
 
-    // 4️⃣ Save everything atomically
+    // 5️⃣ Save everything atomically
     await _isar.writeTxn(() async {
       await _isar.messageCollections.put(message);
       await message.chat.save();
@@ -265,13 +310,11 @@ class _MessageScreenState extends State<MessageScreen> {
         await _isar.mediaFileCollections.put(media);
         await media.message.save();
 
-        // Link both directions
         message.mediaFiles.add(media);
       }
 
       await message.mediaFiles.save();
 
-      // Link message to chat and update
       chat!.messages.add(message);
       await chat.messages.save();
 
@@ -279,18 +322,20 @@ class _MessageScreenState extends State<MessageScreen> {
       await _isar.chatCollections.put(chat);
     });
 
-    // 5️⃣ (Optional) Upload to Cloudinary and update the DB
-    // for (final media in mediaCollections) {
-    //   final uploaded = await uploadToCloudinary(media.url);
-    //   await _isar.writeTxn(() async {
-    //     media.publicId = uploaded.publicId;
-    //     media.url = uploaded.secureUrl;
-    //     await _isar.mediaFileCollections.put(media);
-    //   });
-    // }
+    // 6️⃣ Send message via WebSocket
+    final sentMessage = message.toModel();
+    final outgoingPayload = _buildMessageDtoPayload(
+      message: sentMessage,
+      senderPublicId: myPublicId,
+      receiverPublicId: receiverPublicId,
+      contentType: 'MEDIA', // Set inner message type
+    );
+
+    final wsNotifier = ref.read(webSocketProvider.notifier);
+    wsNotifier.send(jsonEncode(outgoingPayload));
 
     print(
-      "✅ Message with ${mediaCollections.length} media files saved successfully!",
+      "✅ Message with ${mediaCollections.length} media files saved and sent successfully!",
     );
   }
 
@@ -323,6 +368,7 @@ class _MessageScreenState extends State<MessageScreen> {
                         itemCount: messages.length,
                         itemBuilder: (context, index) {
                           final message = messages[index];
+                          // ... (MessageBubble rendering logic)
                           return MessageBubble(
                             text: message.message,
                             mediaFiles: message.mediaFiles,
@@ -334,12 +380,12 @@ class _MessageScreenState extends State<MessageScreen> {
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(
-                                  builder: (_) => MediaViewerScreen(media: media),
+                                  builder:
+                                      (_) => MediaViewerScreen(media: media),
                                 ),
                               );
                             },
                           );
-
                         },
                       );
                     },
@@ -352,24 +398,42 @@ class _MessageScreenState extends State<MessageScreen> {
                   emojiShowing: _emojiShowing,
                   toggleEmojiKeyboard: _toggleEmojiKeyboard,
                   toggleAttachmentSheet: _toggleAttachmentSheet,
-                  
-                  onSend: (text) {
-                    //1. save in db
-                    //2. save in message list
 
-                    // save message to local db first
-                    addMessageLocally(text, widget.chatDto);
+                  onSend: (text) async {
+                    if (text.trim().isEmpty) return;
 
-                    WidgetsBinding.instance.addPostFrameCallback((_) {
-                      if (_scrollController.hasClients &&
-                          _scrollController.positions.isNotEmpty) {
-                        _scrollController.animateTo(
-                          _scrollController.position.maxScrollExtent + 60,
-                          duration: const Duration(milliseconds: 300),
-                          curve: Curves.easeOut,
-                        );
-                      }
-                    });
+                    // 1. Prepare participant IDs and check for valid receiver
+                    final myPublicId =
+                        await SecureStoreService.getPublicUserId();
+                    final receiverPublicId = widget.chatDto.publicUserId;
+
+                    if (receiverPublicId == null) {
+                      print(
+                        "Error: Cannot send message, receiver ID is missing.",
+                      );
+                      return;
+                    }
+
+                    // 2. Save to local db and get the model
+                    final sentMessage = await addMessageLocally(
+                      text,
+                      widget.chatDto,
+                    );
+
+                    // 3. Prepare and Send message DTO for WebSocket
+                    final outgoingPayload = _buildMessageDtoPayload(
+                      message: sentMessage,
+                      senderPublicId: myPublicId,
+                      receiverPublicId: receiverPublicId,
+                      contentType: 'TEXT', // Set inner message type
+                    );
+
+                    final wsNotifier = ref.read(webSocketProvider.notifier);
+                    wsNotifier.send(jsonEncode(outgoingPayload));
+
+                    // Clear controller and scroll to bottom
+                    _controller.clear();
+                    _scrollToBottom();
                   },
                 ),
               ],

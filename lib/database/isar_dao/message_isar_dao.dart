@@ -57,6 +57,38 @@ class MessageIsarDao {
     });
   }
 
+  Future<void> markMessagesAsRead(String chatId) async {
+    // 1. Find the ChatCollection using the external ID
+    final chat =
+        await _isar.chatCollections.filter().idEqualTo(chatId).findFirst();
+
+    if (chat == null) return;
+
+    // 2. Load the messages link
+    await chat.messages.load();
+
+    // 3. Filter for received messages
+    final receivedMessages =
+        chat.messages.where((m) => m.status == 'received').toList();
+
+    if (receivedMessages.isEmpty) return;
+
+    // 4. Update the status and perform a transaction to save changes
+    await _isar.writeTxn(() async {
+      for (final message in receivedMessages) {
+        message.status = 'read';
+      }
+      // Put all updated messages back into the database
+      await _isar.messageCollections.putAll(receivedMessages);
+
+      // 🚨 CRITICAL FIX: Explicitly update the ChatCollection 🚨
+      // This modification forces the chatCollections.watch() stream to fire.
+      chat.lastUpdated = DateTime.now();
+      await _isar.chatCollections.put(chat);
+      // 🚨 END CRITICAL FIX
+    });
+  }
+
   /// Live stream messages for a chat
   Stream<List<MessageModal>> watchMessages(String chatId) {
     return _isar.messageCollections

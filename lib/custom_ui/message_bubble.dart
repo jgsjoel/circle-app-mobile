@@ -30,11 +30,66 @@ class MessageBubble extends StatelessWidget {
   }
 
   String getMediaType(String path) {
+    final isRemote = path.startsWith('http://') || path.startsWith('https://');
+
+    // For simplicity, assume all remote media is an image if no extension is present.
+    // This handles URLs like https://picsum.photos/id/237/200/300
+    if (isRemote) {
+      // Check for common video/audio extensions just in case, otherwise assume image.
+      if (path.contains('.mp4') || path.contains('.mov')) return "video";
+      if (path.contains('.mp3') || path.contains('.wav')) return "audio";
+      return "image";
+    }
+
+    // Original logic for local files
     final ext = path.split('.').last.toLowerCase();
     if (['jpg', 'jpeg', 'png', 'gif'].contains(ext)) return "image";
     if (['mp4', 'mov', 'avi'].contains(ext)) return "video";
     if (['mp3', 'wav', 'm4a'].contains(ext)) return "audio";
     return "unknown";
+  }
+
+  // 🖼️ Helper function to choose the correct image widget
+  Widget _buildImageWidget(String url) {
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      return Image.network(
+        url,
+        width: 150,
+        height: 150,
+        fit: BoxFit.cover,
+        loadingBuilder: (context, child, loadingProgress) {
+          if (loadingProgress == null) return child;
+          return SizedBox(
+            width: 150,
+            height: 150,
+            child: Center(
+              child: CircularProgressIndicator(
+                value:
+                    loadingProgress.expectedTotalBytes != null
+                        ? loadingProgress.cumulativeBytesLoaded /
+                            loadingProgress.expectedTotalBytes!
+                        : null,
+                color: Colors.white,
+              ),
+            ),
+          );
+        },
+        errorBuilder: (context, error, stackTrace) {
+          return const Icon(Icons.error_outline, size: 50, color: Colors.red);
+        },
+      );
+    } else {
+      // Assume local file path
+      return Image.file(
+        File(url),
+        width: 150,
+        height: 150,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) {
+          return const Icon(Icons.broken_image, size: 50, color: Colors.white);
+        },
+      );
+    }
   }
 
   @override
@@ -51,72 +106,74 @@ class MessageBubble extends StatelessWidget {
           Wrap(
             spacing: 8,
             runSpacing: 8,
-            children: mediaFiles.map((media) {
-              final type = getMediaType(media.url);
-              Widget mediaWidget;
+            children:
+                mediaFiles.map((media) {
+                  final type = getMediaType(media.url);
+                  Widget mediaWidget;
 
-              switch (type) {
-                case "image":
-                  mediaWidget = ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: Image.file(
-                      File(media.url),
-                      width: 150,
-                      height: 150,
-                      fit: BoxFit.cover,
-                    ),
-                  );
-                  break;
+                  switch (type) {
+                    case "image":
+                      mediaWidget = ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: _buildImageWidget(
+                          media.url,
+                        ), // ⬅️ USED NEW LOGIC HERE
+                      );
+                      break;
 
-                case "video":
-                  mediaWidget = SizedBox(
-                    width: 150,
-                    height: 150,
-                    child: Stack(
-                      alignment: Alignment.center,
-                      children: [
-                        Container(color: Colors.black26),
-                        const Icon(Icons.play_circle_outline, size: 50, color: Colors.white),
-                      ],
-                    ),
-                  );
-                  break;
-
-                case "audio":
-                  mediaWidget = Container(
-                    width: 200,
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: Colors.black26,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.audiotrack, color: Colors.white),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            media.id,
-                            style: const TextStyle(color: Colors.white),
-                            overflow: TextOverflow.ellipsis,
-                          ),
+                    case "video":
+                      mediaWidget = SizedBox(
+                        width: 150,
+                        height: 150,
+                        child: Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            Container(color: Colors.black26),
+                            const Icon(
+                              Icons.play_circle_outline,
+                              size: 50,
+                              color: Colors.white,
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
+                      );
+                      break;
+
+                    case "audio":
+                      mediaWidget = Container(
+                        width: 200,
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.black26,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.audiotrack, color: Colors.white),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                media.id,
+                                style: const TextStyle(color: Colors.white),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                      break;
+
+                    default:
+                      mediaWidget = const SizedBox.shrink();
+                  }
+
+                  return GestureDetector(
+                    onTap: () {
+                      if (onMediaTap != null) onMediaTap!(media);
+                    },
+                    child: mediaWidget,
                   );
-                  break;
-
-                default:
-                  mediaWidget = const SizedBox.shrink();
-              }
-
-              return GestureDetector(
-                onTap: () {
-                  if (onMediaTap != null) onMediaTap!(media);
-                },
-                child: mediaWidget,
-              );
-            }).toList(),
+                }).toList(),
           ),
         const SizedBox(height: 6),
         Row(
@@ -145,9 +202,10 @@ class MessageBubble extends StatelessWidget {
         maxWidth: MediaQuery.of(context).size.width * 0.75,
       ),
       child: Card(
-        color: isMe
-            ? const Color.fromARGB(255, 4, 117, 209)
-            : const Color.fromARGB(255, 86, 86, 86),
+        color:
+            isMe
+                ? const Color.fromARGB(255, 4, 117, 209)
+                : const Color.fromARGB(255, 86, 86, 86),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.only(
             topLeft: const Radius.circular(15),

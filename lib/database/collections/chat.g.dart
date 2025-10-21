@@ -48,7 +48,21 @@ const ChatCollectionSchema = CollectionSchema(
   deserialize: _chatCollectionDeserialize,
   deserializeProp: _chatCollectionDeserializeProp,
   idName: r'isarId',
-  indexes: {},
+  indexes: {
+    r'lastUpdated': IndexSchema(
+      id: 8989359681631629925,
+      name: r'lastUpdated',
+      unique: false,
+      replace: false,
+      properties: [
+        IndexPropertySchema(
+          name: r'lastUpdated',
+          type: IndexType.value,
+          caseSensitive: false,
+        )
+      ],
+    )
+  },
   links: {
     r'messages': LinkSchema(
       id: 7954709436895150394,
@@ -167,6 +181,14 @@ extension ChatCollectionQueryWhereSort
       return query.addWhereClause(const IdWhereClause.any());
     });
   }
+
+  QueryBuilder<ChatCollection, ChatCollection, QAfterWhere> anyLastUpdated() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(
+        const IndexWhereClause.any(indexName: r'lastUpdated'),
+      );
+    });
+  }
 }
 
 extension ChatCollectionQueryWhere
@@ -233,6 +255,99 @@ extension ChatCollectionQueryWhere
         lower: lowerIsarId,
         includeLower: includeLower,
         upper: upperIsarId,
+        includeUpper: includeUpper,
+      ));
+    });
+  }
+
+  QueryBuilder<ChatCollection, ChatCollection, QAfterWhereClause>
+      lastUpdatedEqualTo(DateTime lastUpdated) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(IndexWhereClause.equalTo(
+        indexName: r'lastUpdated',
+        value: [lastUpdated],
+      ));
+    });
+  }
+
+  QueryBuilder<ChatCollection, ChatCollection, QAfterWhereClause>
+      lastUpdatedNotEqualTo(DateTime lastUpdated) {
+    return QueryBuilder.apply(this, (query) {
+      if (query.whereSort == Sort.asc) {
+        return query
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'lastUpdated',
+              lower: [],
+              upper: [lastUpdated],
+              includeUpper: false,
+            ))
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'lastUpdated',
+              lower: [lastUpdated],
+              includeLower: false,
+              upper: [],
+            ));
+      } else {
+        return query
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'lastUpdated',
+              lower: [lastUpdated],
+              includeLower: false,
+              upper: [],
+            ))
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'lastUpdated',
+              lower: [],
+              upper: [lastUpdated],
+              includeUpper: false,
+            ));
+      }
+    });
+  }
+
+  QueryBuilder<ChatCollection, ChatCollection, QAfterWhereClause>
+      lastUpdatedGreaterThan(
+    DateTime lastUpdated, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(IndexWhereClause.between(
+        indexName: r'lastUpdated',
+        lower: [lastUpdated],
+        includeLower: include,
+        upper: [],
+      ));
+    });
+  }
+
+  QueryBuilder<ChatCollection, ChatCollection, QAfterWhereClause>
+      lastUpdatedLessThan(
+    DateTime lastUpdated, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(IndexWhereClause.between(
+        indexName: r'lastUpdated',
+        lower: [],
+        upper: [lastUpdated],
+        includeUpper: include,
+      ));
+    });
+  }
+
+  QueryBuilder<ChatCollection, ChatCollection, QAfterWhereClause>
+      lastUpdatedBetween(
+    DateTime lowerLastUpdated,
+    DateTime upperLastUpdated, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(IndexWhereClause.between(
+        indexName: r'lastUpdated',
+        lower: [lowerLastUpdated],
+        includeLower: includeLower,
+        upper: [upperLastUpdated],
         includeUpper: includeUpper,
       ));
     });

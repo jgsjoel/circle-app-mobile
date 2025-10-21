@@ -9,6 +9,7 @@ part 'message.g.dart';
 class MessageCollection {
   Id id = Isar.autoIncrement;
 
+  String? messageId;
   String? msgPubId;
   late String message;
   late bool fromMe;
@@ -22,6 +23,7 @@ class MessageCollection {
 
   MessageCollection copyWith({
     Id? id,
+    String? messageId,
     String? msgPubId,
     String? message,
     bool? fromMe,
@@ -30,6 +32,7 @@ class MessageCollection {
   }) {
     return MessageCollection()
       ..id = id ?? this.id
+      ..messageId = messageId ?? this.messageId
       ..msgPubId = msgPubId ?? this.msgPubId
       ..message = message ?? this.message
       ..fromMe = fromMe ?? this.fromMe
@@ -45,6 +48,7 @@ class MessageCollection {
 
     return MessageModal(
       id: id,
+      messageId: messageId,
       msgPubId: msgPubId,
       message: message,
       fromMe: fromMe,
@@ -58,6 +62,7 @@ class MessageCollection {
   factory MessageCollection.fromModel(MessageModal model) {
     return MessageCollection()
       ..id = model.id ?? Isar.autoIncrement
+      ..messageId = model.messageId
       ..msgPubId = model.msgPubId
       ..message = model.message
       ..fromMe = model.fromMe
