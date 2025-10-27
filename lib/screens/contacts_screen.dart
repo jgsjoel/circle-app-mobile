@@ -1,4 +1,4 @@
-import 'package:chat/database/isar_dao/contact_isar_dao.dart';
+import 'package:chat/database/daos/contact_dao.dart';
 import 'package:chat/dtos/chat_dto.dart';
 import 'package:chat/screens/message_screen.dart';
 import 'package:chat/services/service_locator.dart';
@@ -12,7 +12,7 @@ class ContactsScreen extends StatefulWidget {
 }
 
 class _ContactsScreenState extends State<ContactsScreen> {
-  final ContactIsarDao contactIsarDao = getIt<ContactIsarDao>();
+  final ContactObjectBoxDao contactIsarDao = getIt<ContactObjectBoxDao>();
 
   List<ChatDto> _contactsAndChats = [];
   bool _isLoading = true;

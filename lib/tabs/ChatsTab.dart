@@ -1,4 +1,4 @@
-import 'package:chat/database/isar_dao/chat_isar_dao.dart';
+import 'package:chat/database/daos/chat_dao.dart';
 import 'package:chat/dtos/chat_dto.dart';
 import 'package:chat/services/service_locator.dart';
 import 'package:flutter/material.dart';
@@ -17,7 +17,7 @@ class _ChatstabState extends State<Chatstab> {
   @override
   void initState() {
     super.initState();
-    final chatDao = getIt<ChatIsarDao>();
+    final chatDao = getIt<ChatObjectBoxDao>();
     chatStream = chatDao.watchAllChats();
   }
 
@@ -49,7 +49,7 @@ class _ChatstabState extends State<Chatstab> {
                 key: ValueKey(chat.id),
                 chatDto: chat,
                 onDelete: () async {
-                  final chatDao = getIt<ChatIsarDao>();
+                  final chatDao = getIt<ChatObjectBoxDao>();
                   // await chatDao.deleteChat(chat.id!);
                 },
               );

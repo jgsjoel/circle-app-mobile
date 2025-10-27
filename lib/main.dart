@@ -3,7 +3,6 @@ import 'package:chat/screens/contacts_screen.dart';
 import 'package:chat/screens/home_screen.dart';
 import 'package:chat/screens/landing_screen.dart';
 import 'package:chat/screens/phone_number%20entry.dart';
-import 'package:chat/database/database_helper.dart';
 import 'package:chat/services/service_locator.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -29,9 +28,12 @@ Future<void> main() async {
     ),
   );
 
-  await setupLocator();
-
-  await getIt<DatabaseHelper>().database;
+  // Initialize service locator and wait for it to complete
+  try {
+    await setupLocator();
+  } catch (e) {
+    print('Error initializing services: $e');
+  }
 
   runApp(
     const ProviderScope(

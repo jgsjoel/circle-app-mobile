@@ -1,42 +1,34 @@
-import 'package:chat/database/collections/chat.dart';
-import 'package:chat/database/collections/chat_participant.dart';
-import 'package:chat/database/collections/contact.dart';
+import 'package:chat/database/entities/chat.dart';
+import 'package:chat/database/entities/chat_participant.dart';
+import 'package:chat/database/entities/contact.dart';
 import 'package:chat/dtos/chat_dto.dart';
 import 'package:chat/services/secure_store_service.dart';
 import 'package:chat/services/service_locator.dart';
-import 'package:isar/isar.dart';
+import 'package:objectbox/objectbox.dart';
+import 'package:chat/objectbox.g.dart'; // Importing generated query properties
 
-class ChatIsarDao {
-  final Isar _isar = getIt<Isar>();
+class ChatObjectBoxDao {
+  final Store _store = getIt<Store>();
 
-  Future<void> saveChat(ChatCollection chat) async {
-    await _isar.writeTxn(() async {
-      await _isar.chatCollections.put(chat);
-    });
+  Box<ChatEntity> get _chatBox => _store.box<ChatEntity>();
+  Box<ContactEntity> get _contactBox => _store.box<ContactEntity>();
+
+  Future<void> saveChat(ChatEntity chat) async {
+    _chatBox.put(chat);
   }
 
-  Future<ChatCollection?> getChatById(String id) async {
-    return await _isar.chatCollections.filter().idEqualTo(id).findFirst();
-  }
-
-  Future<ChatCollection?> getChatByIsarId(int isarId) async {
-    return await _isar.chatCollections.get(isarId);
+  ChatEntity? getChatById(int id) {
+    return _chatBox.query(ChatEntity_.id.equals(id)).build().findFirst();
   }
 
   Stream<List<ChatDto>> watchAllChats() async* {
     final myPublicId = await SecureStoreService.getPublicUserId();
 
-    await for (final chats in _isar.chatCollections.where().watch(
-      fireImmediately: true,
-    )) {
+    yield* _chatBox.query().watch(triggerImmediately: true).asyncMap((query) async {
+      final chats = query.find();
       final List<ChatDto> chatDtos = [];
 
       for (final chat in chats) {
-        // Load links
-        await chat.participants.load();
-        await chat.messages.load();
-
-        // Safely get messages
         final messagesList = chat.messages.toList();
         messagesList.sort((a, b) => b.timestamp.compareTo(a.timestamp));
 
@@ -44,25 +36,22 @@ class ChatIsarDao {
         final unreadCount =
             messagesList.where((m) => m.status == 'received').length;
 
-        // Display name for 1:1 chat
-        String displayName = chat.name ?? 'Unknown';
+        String displayName = chat.name;
         String? phone;
         String? contactPublicId;
 
         if (!chat.isGroup) {
           final participant = chat.participants.firstWhere(
             (p) => p.contactPublicId != myPublicId,
-            orElse:
-                () => ChatParticipantCollection()..contactPublicId = 'unknown',
+            orElse: () => ChatParticipantEntity(contactPublicId: 'unknown'),
           );
           contactPublicId = participant.contactPublicId;
 
           if (contactPublicId.isNotEmpty && contactPublicId != 'unknown') {
-            final contact =
-                await _isar.contactCollections
-                    .filter()
-                    .publicIdEqualTo(contactPublicId)
-                    .findFirst();
+            final contact = _contactBox
+                .query(ContactEntity_.publicId.equals(contactPublicId))
+                .build()
+                .findFirst();
             if (contact != null) {
               displayName = contact.name;
               phone = contact.phone;
@@ -72,36 +61,49 @@ class ChatIsarDao {
 
         chatDtos.add(
           ChatDto(
-            id: chat.id,
+            id: chat.id.toString(),
             name: displayName,
             isGroup: chat.isGroup,
             pubChatId: chat.publicChatId,
             publicUserId: contactPublicId ?? '',
             phone: phone,
             lastMessage: lastMessage?.message ?? 'No messages yet',
-            time:
-                lastMessage != null
-                    ? lastMessage.timestamp.toString()
-                    : DateTime.now().millisecondsSinceEpoch.toString(),
+            time: lastMessage != null
+                ? lastMessage.timestamp.toString()
+                : DateTime.now().millisecondsSinceEpoch.toString(),
             messageCount: unreadCount,
           ),
         );
       }
 
-      // Sort chats by last message timestamp descending
       chatDtos.sort((a, b) {
         final aTime = int.tryParse(a.time ?? '0') ?? 0;
         final bTime = int.tryParse(b.time ?? '0') ?? 0;
         return bTime.compareTo(aTime);
       });
 
-      yield chatDtos;
-    }
+      return chatDtos;
+    });
   }
 
-  Future<bool> deleteChat(int isarId) async {
-    return await _isar.writeTxn(() async {
-      return await _isar.chatCollections.delete(isarId);
-    });
+  bool deleteChat(int id) {
+    return _chatBox.remove(id);
+  }
+
+  ChatEntity createChat(ChatDto dto) {
+    final chat = ChatEntity(
+      name: dto.name,
+      publicChatId: dto.pubChatId,
+      isGroup: dto.isGroup,
+      lastUpdated: DateTime.now(),
+    );
+
+    saveChat(chat);
+    return chat;
+  }
+
+  void updateLastUpdated(ChatEntity chat) {
+    chat.lastUpdated = DateTime.now();
+    saveChat(chat);
   }
 }

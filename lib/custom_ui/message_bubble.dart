@@ -12,6 +12,7 @@ class MessageBubble extends StatelessWidget {
   final int timeStamp;
   final List<MediaFile> mediaFiles;
   final Function(MediaFile media)? onMediaTap;
+  final String? status; // 🆕 Add this
 
   const MessageBubble({
     Key? key,
@@ -22,6 +23,7 @@ class MessageBubble extends StatelessWidget {
     required this.timeStamp,
     this.mediaFiles = const [],
     this.onMediaTap,
+    this.status, // 🆕 Add this
   }) : super(key: key);
 
   String convertTime(int timeStamp) {
@@ -31,17 +33,11 @@ class MessageBubble extends StatelessWidget {
 
   String getMediaType(String path) {
     final isRemote = path.startsWith('http://') || path.startsWith('https://');
-
-    // For simplicity, assume all remote media is an image if no extension is present.
-    // This handles URLs like https://picsum.photos/id/237/200/300
     if (isRemote) {
-      // Check for common video/audio extensions just in case, otherwise assume image.
       if (path.contains('.mp4') || path.contains('.mov')) return "video";
       if (path.contains('.mp3') || path.contains('.wav')) return "audio";
       return "image";
     }
-
-    // Original logic for local files
     final ext = path.split('.').last.toLowerCase();
     if (['jpg', 'jpeg', 'png', 'gif'].contains(ext)) return "image";
     if (['mp4', 'mov', 'avi'].contains(ext)) return "video";
@@ -49,7 +45,22 @@ class MessageBubble extends StatelessWidget {
     return "unknown";
   }
 
-  // 🖼️ Helper function to choose the correct image widget
+  // 🆕 Helper to pick status icon based on message.status
+  Widget _buildStatusIcon() {
+    switch (status!.toLowerCase()) {
+      case 'sending':
+        return const Icon(Icons.access_time, size: 16, color: Colors.white70);
+      case 'sent':
+        return const Icon(Icons.check, size: 16, color: Colors.white70);
+      case 'received':
+        return const Icon(Icons.done_all, size: 16, color: Colors.white70);
+      case 'read':
+        return const Icon(Icons.done_all, size: 16, color: Colors.blueAccent);
+      default:
+        return const SizedBox.shrink();
+    }
+  }
+
   Widget _buildImageWidget(String url) {
     if (url.startsWith('http://') || url.startsWith('https://')) {
       return Image.network(
@@ -64,22 +75,21 @@ class MessageBubble extends StatelessWidget {
             height: 150,
             child: Center(
               child: CircularProgressIndicator(
-                value:
-                    loadingProgress.expectedTotalBytes != null
-                        ? loadingProgress.cumulativeBytesLoaded /
-                            loadingProgress.expectedTotalBytes!
-                        : null,
+                value: loadingProgress.expectedTotalBytes != null
+                    ? loadingProgress.cumulativeBytesLoaded /
+                        loadingProgress.expectedTotalBytes!
+                    : null,
                 color: Colors.white,
               ),
             ),
           );
         },
         errorBuilder: (context, error, stackTrace) {
+          print(error);
           return const Icon(Icons.error_outline, size: 50, color: Colors.red);
         },
       );
     } else {
-      // Assume local file path
       return Image.file(
         File(url),
         width: 150,
@@ -106,74 +116,65 @@ class MessageBubble extends StatelessWidget {
           Wrap(
             spacing: 8,
             runSpacing: 8,
-            children:
-                mediaFiles.map((media) {
-                  final type = getMediaType(media.url);
-                  Widget mediaWidget;
+            children: mediaFiles.map((media) {
+              final type = getMediaType(media.url);
+              Widget mediaWidget;
 
-                  switch (type) {
-                    case "image":
-                      mediaWidget = ClipRRect(
-                        borderRadius: BorderRadius.circular(8),
-                        child: _buildImageWidget(
-                          media.url,
-                        ), // ⬅️ USED NEW LOGIC HERE
-                      );
-                      break;
-
-                    case "video":
-                      mediaWidget = SizedBox(
-                        width: 150,
-                        height: 150,
-                        child: Stack(
-                          alignment: Alignment.center,
-                          children: [
-                            Container(color: Colors.black26),
-                            const Icon(
-                              Icons.play_circle_outline,
-                              size: 50,
-                              color: Colors.white,
-                            ),
-                          ],
-                        ),
-                      );
-                      break;
-
-                    case "audio":
-                      mediaWidget = Container(
-                        width: 200,
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: Colors.black26,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Row(
-                          children: [
-                            const Icon(Icons.audiotrack, color: Colors.white),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                media.id,
-                                style: const TextStyle(color: Colors.white),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ],
-                        ),
-                      );
-                      break;
-
-                    default:
-                      mediaWidget = const SizedBox.shrink();
-                  }
-
-                  return GestureDetector(
-                    onTap: () {
-                      if (onMediaTap != null) onMediaTap!(media);
-                    },
-                    child: mediaWidget,
+              switch (type) {
+                case "image":
+                  mediaWidget = ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: _buildImageWidget(media.url),
                   );
-                }).toList(),
+                  break;
+                case "video":
+                  mediaWidget = SizedBox(
+                    width: 150,
+                    height: 150,
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        Container(color: Colors.black26),
+                        const Icon(Icons.play_circle_outline,
+                            size: 50, color: Colors.white),
+                      ],
+                    ),
+                  );
+                  break;
+                case "audio":
+                  mediaWidget = Container(
+                    width: 200,
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.black26,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.audiotrack, color: Colors.white),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            media.id,
+                            style: const TextStyle(color: Colors.white),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                  break;
+                default:
+                  mediaWidget = const SizedBox.shrink();
+              }
+
+              return GestureDetector(
+                onTap: () {
+                  if (onMediaTap != null) onMediaTap!(media);
+                },
+                child: mediaWidget,
+              );
+            }).toList(),
           ),
         const SizedBox(height: 6),
         Row(
@@ -190,7 +191,7 @@ class MessageBubble extends StatelessWidget {
             ),
             if (isMe) ...[
               const SizedBox(width: 4),
-              const Icon(Icons.done_all, size: 16, color: Colors.white70),
+              _buildStatusIcon(), // 🔁 replaced fixed icon with dynamic one
             ],
           ],
         ),
@@ -198,14 +199,12 @@ class MessageBubble extends StatelessWidget {
     );
 
     Widget card = ConstrainedBox(
-      constraints: BoxConstraints(
-        maxWidth: MediaQuery.of(context).size.width * 0.75,
-      ),
+      constraints:
+          BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.75),
       child: Card(
-        color:
-            isMe
-                ? const Color.fromARGB(255, 4, 117, 209)
-                : const Color.fromARGB(255, 86, 86, 86),
+        color: isMe
+            ? const Color.fromARGB(255, 4, 117, 209)
+            : const Color.fromARGB(255, 86, 86, 86),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.only(
             topLeft: const Radius.circular(15),

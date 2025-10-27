@@ -1,8 +1,8 @@
 import 'dart:convert';
 
-import 'package:chat/database/collections/contact.dart';
+import 'package:chat/database/entities/contact.dart';
+import 'package:chat/database/daos/contact_dao.dart'; // Corrected import path
 import 'package:chat/database/db_modals/contact_modal.dart';
-import 'package:chat/database/isar_dao/contact_isar_dao.dart';
 import 'package:chat/services/api_service.dart';
 import 'package:chat/services/service_locator.dart';
 import 'package:dio/dio.dart';
@@ -10,7 +10,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_contacts/flutter_contacts.dart';
 
 class ContactService {
-  final ContactIsarDao _contactIsarDao = getIt<ContactIsarDao>();
+  final ContactObjectBoxDao _contactDao = getIt<ContactObjectBoxDao>();
   final _dio = ApiService.instance.dio;
 
   Future<void> syncContacts() async {
@@ -21,8 +21,12 @@ class ContactService {
     List<ContactModal> contactList = _sanitizeContacts(contacts);
 
     //get all local db contacts
-    final localContactsCollection = await _contactIsarDao.getAllContacts();
-    List<ContactModal> localContacts = localContactsCollection.map((contact)=>contact.toModel()).toList();
+    final localContactsCollection = _contactDao.getAllContacts();
+    List<ContactModal> localContacts = localContactsCollection.map((contact) => ContactModal(
+      name: contact.name,
+      phone: contact.phone,
+      pubContactId: contact.publicId,
+    )).toList();
 
     //if not available then send to server and save the returned ones
     if (localContacts.isEmpty) {
@@ -77,7 +81,7 @@ class ContactService {
           pubContactId: localEntry.pubContactId,
         );
 
-        await _contactIsarDao.updateContactByPublicId(ContactCollection.fromModel(updatedContact).publicId, name: updatedContact.name);
+        updateContact(updatedContact.pubContactId!, updatedContact.name);
       }
     }
   }
@@ -132,7 +136,7 @@ class ContactService {
 
       // Save to local database
       for (var contact in returnedContacts) {
-        await _contactIsarDao.saveContact(ContactCollection.fromModel(contact));
+        saveContact(ContactEntity.fromModel(contact));
       }
     } on DioException catch (e) {
       print("----------Here---------");
@@ -140,5 +144,13 @@ class ContactService {
       print("Failed to sync contacts: ${e.response?.data ?? e.message}");
       rethrow;
     }
+  }
+
+  void updateContact(String publicId, String name) {
+    _contactDao.updateContactByPublicId(publicId, name: name);
+  }
+
+  void saveContact(ContactEntity contact) {
+    _contactDao.saveContact(contact);
   }
 }
