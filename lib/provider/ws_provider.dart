@@ -77,9 +77,20 @@ class WebSocketNotifier extends StateNotifier<WebSocketService?> {
           .findFirst();
           
       if (msg != null) {
+        // Update message status and public ID
         msg.status = u.messageStatus;
         msg.msgPubId = u.pubMsgId;
         _messageBox.put(msg);
+
+        // Update chat's public ID if provided
+        if (u.pubChatId.isNotEmpty) {
+          final chat = msg.chat.target;
+          if (chat != null && (chat.publicChatId?.isEmpty ?? true)) {
+            chat.publicChatId = u.pubChatId;
+            _chatBox.put(chat);
+            print("✅ Updated chat public ID to: ${u.pubChatId}");
+          }
+        }
       }
     }
   }

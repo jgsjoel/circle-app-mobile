@@ -5,13 +5,13 @@ import 'package:chat/custom_ui/message_input.dart';
 import 'package:chat/dtos/chat_dto.dart';
 import 'package:chat/database/db_modals/message_modal.dart';
 import 'package:chat/database/daos/message_dao.dart';
+import 'package:chat/provider/chat_provider.dart';
 import 'package:chat/screens/media_view.dart';
 import 'package:chat/services/message_serivce.dart';
 import 'package:chat/services/secure_store_service.dart';
 import 'package:chat/services/service_locator.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:uuid/uuid.dart';
 import 'package:chat/provider/ws_provider.dart';
 
 // Changed to ConsumerStatefulWidget
@@ -29,7 +29,6 @@ class _MessageScreenState extends ConsumerState<MessageScreen> {
   final ScrollController _scrollController = ScrollController();
   final MessageService _messageService = getIt<MessageService>();
   final FocusNode _focusNode = FocusNode();
-  final _uuid = const Uuid();
 
   bool _emojiShowing = false;
   bool _showAttachmentSheet = false; 
@@ -95,11 +94,26 @@ class _MessageScreenState extends ConsumerState<MessageScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final chatAsyncValue = ref.watch(selectedChatProvider(widget.chatDto.id!));
+    
     return SafeArea(
       child: Scaffold(
         appBar: AppBar(
           leading: BackButton(onPressed: _handleBack),
-          title: Text(widget.chatDto.name),
+          title: chatAsyncValue.when(
+            data: (updatedChat) => Text(
+              updatedChat.name,
+              style: const TextStyle(fontSize: 16),
+            ),
+            loading: () => Text(
+              widget.chatDto.name,
+              style: const TextStyle(fontSize: 16),
+            ),
+            error: (_, __) => Text(
+              widget.chatDto.name,
+              style: const TextStyle(fontSize: 16),
+            ),
+          ),
         ),
         body: Stack(
           children: [

@@ -8,7 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-
+import 'package:video_compress/video_compress.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
@@ -27,6 +27,9 @@ Future<void> main() async {
       systemNavigationBarIconBrightness: Brightness.light, // icons = white
     ),
   );
+
+  // Initialize video compression
+  await VideoCompress.setLogLevel(0);
 
   // Initialize service locator and wait for it to complete
   try {

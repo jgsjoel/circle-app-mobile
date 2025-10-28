@@ -8,12 +8,14 @@ import 'package:chat/dtos/chat_dto.dart';
 import 'package:chat/models/media_selection.dart';
 import 'package:chat/services/secure_store_service.dart';
 import 'package:chat/services/service_locator.dart';
+import 'package:chat/services/media_upload_service.dart';
 
 class MessageService {
   final ChatObjectBoxDao _chatDao = getIt<ChatObjectBoxDao>();
   final ChatParticipantObjectBoxDao _participantDao = getIt<ChatParticipantObjectBoxDao>();
   final MessageDao _messageDao = getIt<MessageDao>();
   final MediaFileObjectBoxDao _mediaFileDao = getIt<MediaFileObjectBoxDao>();
+  final MediaUploadService _mediaUploadService = MediaUploadService.instance;
 
   Future<MessageModal> addMessageLocally(String text, ChatDto chatDto) async {
     // 1️⃣ Find or create chat
@@ -36,6 +38,7 @@ class MessageService {
     List<MediaFile> mediaFiles,
     ChatDto chatDto,
   ) async {
+    print("handleMediaSelected triggered-------------");
     final myPublicId = await SecureStoreService.getPublicUserId();
     final receiverPublicId = chatDto.publicUserId;
 
@@ -44,26 +47,40 @@ class MessageService {
       return {'error': 'Receiver ID missing', 'success': false};
     }
 
-    // 1️⃣ Find or create chat
+    // If we don't have a pubChatId, use the local chat ID temporarily
+    final chatId = chatDto.pubChatId?.isNotEmpty == true 
+        ? chatDto.pubChatId!
+        : chatDto.id ?? '0';
+
+    // 1️⃣ Upload media files to Cloudinary
+    try {
+      print("🔄 Uploading media with chat ID: $chatId");
+      mediaFiles = await _mediaUploadService.handleMediaUpload(mediaFiles, chatId);
+    } catch (e) {
+      print("❌ Media upload failed: $e");
+      return {'error': 'Media upload failed', 'success': false};
+    }
+
+    // 2️⃣ Find or create chat
     ChatEntity? chat = _chatDao.getChatById(int.parse(chatDto.id ?? '0'));
     if (chat == null) {
       chat = _chatDao.createChat(chatDto);
       _participantDao.addParticipants(chat, chatDto);
     }
 
-    // 2️⃣ Create message (empty text or media caption)
+    // 3️⃣ Create message with caption from first media
     final message = _messageDao.createMessage(
       mediaFiles.first.caption ?? '',
       chat,
     );
 
-    // 3️⃣ Link media files to message
+    // 4️⃣ Link uploaded media files to message
     _mediaFileDao.saveMediaFiles(mediaFiles, message);
 
-    // 4️⃣ Update chat timestamp
+    // 5️⃣ Update chat timestamp
     _chatDao.updateLastUpdated(chat);
 
-    // 5️⃣ Send message over WebSocket
+    // 6️⃣ Send message over WebSocket
     final sentMessage = message.toModel();
     return buildMessageDtoPayload(
       message: sentMessage,
@@ -79,7 +96,7 @@ class MessageService {
     required String senderPublicId,
     required String receiverPublicId,
     required String contentType,
-    required String chatId,
+    required String chatId, 
   }) {
     final mediaList =
         message.mediaFiles

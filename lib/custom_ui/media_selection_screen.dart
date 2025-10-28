@@ -137,7 +137,7 @@ class _MediaSelectionScreenState extends State<MediaSelectionScreen> {
           .toList();
     } else {
       mediaWithCaptions = selectedMedia.mapIndexed((i, m) {
-        final c = _captionControllers[i]?.text ?? '';
+        final c = _captionControllers[i]?.text ?? ''; 
         return m.copyWith(caption: c);
       }).toList();
     }
