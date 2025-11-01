@@ -12,7 +12,8 @@ class MessageBubble extends StatelessWidget {
   final int timeStamp;
   final List<MediaFile> mediaFiles;
   final Function(MediaFile media)? onMediaTap;
-  final String? status; // 🆕 Add this
+  final String? status;
+  final VoidCallback? onRetry; // 🆕 Add retry callback
 
   const MessageBubble({
     Key? key,
@@ -23,7 +24,8 @@ class MessageBubble extends StatelessWidget {
     required this.timeStamp,
     this.mediaFiles = const [],
     this.onMediaTap,
-    this.status, // 🆕 Add this
+    this.status,
+    this.onRetry, // 🆕 Add this
   }) : super(key: key);
 
   String convertTime(int timeStamp) {
@@ -47,63 +49,129 @@ class MessageBubble extends StatelessWidget {
 
   // 🆕 Helper to pick status icon based on message.status
   Widget _buildStatusIcon() {
+    if (status == null) return const SizedBox.shrink();
+    
     switch (status!.toLowerCase()) {
+      case 'pending':
+        return const SizedBox(
+          width: 16,
+          height: 16,
+          child: CircularProgressIndicator(
+            strokeWidth: 2,
+            valueColor: AlwaysStoppedAnimation<Color>(Colors.white70),
+          ),
+        );
+      case 'failed':
+        return GestureDetector(
+          onTap: onRetry,
+          child: const Icon(
+            Icons.error_outline,
+            size: 16,
+            color: Colors.redAccent,
+          ),
+        );
       case 'sending':
-        return const Icon(Icons.access_time, size: 16, color: Colors.white70);
+        return const Icon(Icons.access_time, size: 16, color: Colors.white54);
       case 'sent':
-        return const Icon(Icons.check, size: 16, color: Colors.white70);
+        return const Icon(Icons.check, size: 16, color: Colors.white54);
       case 'received':
-        return const Icon(Icons.done_all, size: 16, color: Colors.white70);
+        return const Icon(Icons.done_all, size: 16, color: Colors.white54);
       case 'read':
-        return const Icon(Icons.done_all, size: 16, color: Colors.blueAccent);
+        return const Icon(Icons.done_all, size: 16, color: Colors.blue);
       default:
         return const SizedBox.shrink();
     }
   }
 
-  Widget _buildImageWidget(String url) {
-    if (url.startsWith('http://') || url.startsWith('https://')) {
-      return Image.network(
-        url,
-        width: 150,
-        height: 150,
-        fit: BoxFit.cover,
-        loadingBuilder: (context, child, loadingProgress) {
-          if (loadingProgress == null) return child;
-          return SizedBox(
-            width: 150,
-            height: 150,
-            child: Center(
-              child: CircularProgressIndicator(
-                value: loadingProgress.expectedTotalBytes != null
-                    ? loadingProgress.cumulativeBytesLoaded /
-                        loadingProgress.expectedTotalBytes!
-                    : null,
-                color: Colors.white,
-              ),
+  Widget _buildMediaUnavailableWidget() {
+    return Container(
+      width: 150,
+      height: 150,
+      decoration: BoxDecoration(
+        color: Colors.grey[800],
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: const [
+          Icon(
+            Icons.broken_image_outlined,
+            size: 40,
+            color: Colors.white70,
+          ),
+          SizedBox(height: 8),
+          Text(
+            'Media Unavailable',
+            style: TextStyle(
+              color: Colors.white70,
+              fontSize: 12,
             ),
-          );
-        },
-        errorBuilder: (context, error, stackTrace) {
-          print(error);
-          return const Icon(Icons.error_outline, size: 50, color: Colors.red);
-        },
-      );
-    } else {
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildImageWidget(MediaFile media) {
+    // For local files, check if the file exists first
+    if (media.source.startsWith('/') || media.source.startsWith('file://')) {
+      final file = File(media.source.replaceFirst('file://', ''));
+      if (!file.existsSync()) {
+        print("❌ Local file not found: ${media.source}");
+        return _buildMediaUnavailableWidget();
+      }
       return Image.file(
-        File(url),
+        file,
         width: 150,
         height: 150,
         fit: BoxFit.cover,
         errorBuilder: (context, error, stackTrace) {
-          return const Icon(Icons.broken_image, size: 50, color: Colors.white);
+          print("❌ Error loading local image: $error");
+          return _buildMediaUnavailableWidget();
         },
       );
     }
+    
+    // For network URLs
+    return Image.network(
+      media.source,
+      width: 150,
+      height: 150,
+      fit: BoxFit.cover,
+      loadingBuilder: (context, child, loadingProgress) {
+        if (loadingProgress == null) return child;
+        return SizedBox(
+          width: 150,
+          height: 150,
+          child: Center(
+            child: CircularProgressIndicator(
+              value: loadingProgress.expectedTotalBytes != null
+                  ? loadingProgress.cumulativeBytesLoaded /
+                      loadingProgress.expectedTotalBytes!
+                  : null,
+              color: Colors.white,
+            ),
+          ),
+        );
+      },
+      errorBuilder: (context, error, stackTrace) {
+        print("❌ Error loading network image: $error");
+        return _buildMediaUnavailableWidget();
+      },
+    );
   }
 
   @override
   Widget build(BuildContext context) {
+    // Add debug logging for media files
+    if (mediaFiles.isNotEmpty) {
+      print("📸 Message has ${mediaFiles.length} media files:");
+      for (var media in mediaFiles) {
+        print("   - Source: ${media.source}");
+        print("   - Public ID: ${media.publicId}");
+      }
+    }
+
     Widget messageContent = Column(
       crossAxisAlignment:
           isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
@@ -117,14 +185,14 @@ class MessageBubble extends StatelessWidget {
             spacing: 8,
             runSpacing: 8,
             children: mediaFiles.map((media) {
-              final type = getMediaType(media.url);
+              final type = getMediaType(media.source);
               Widget mediaWidget;
 
               switch (type) {
                 case "image":
                   mediaWidget = ClipRRect(
                     borderRadius: BorderRadius.circular(8),
-                    child: _buildImageWidget(media.url),
+                    child: _buildImageWidget(media),
                   );
                   break;
                 case "video":
@@ -203,7 +271,7 @@ class MessageBubble extends StatelessWidget {
           BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.75),
       child: Card(
         color: isMe
-            ? const Color.fromARGB(255, 4, 117, 209)
+            ? const Color.fromARGB(255, 2, 99, 138)
             : const Color.fromARGB(255, 86, 86, 86),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.only(

@@ -13,6 +13,9 @@ class WebSocketService {
 
   final _controller = StreamController<String>.broadcast();
   Stream<String> get messages => _controller.stream;
+  
+  // 🆕 Add public getter to check connection status
+  bool get isConnected => _isConnected;
 
   WebSocketService();
 

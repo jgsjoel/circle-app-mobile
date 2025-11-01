@@ -5,7 +5,7 @@ import 'package:intl/intl.dart';
 
 class ChatsCard extends StatelessWidget {
   final ChatDto chatDto;
-  final VoidCallback onDelete; // callback to delete chat
+  final VoidCallback onDelete;
   const ChatsCard({super.key, required this.chatDto, required this.onDelete});
 
   String _formatTime(String? timestamp) {

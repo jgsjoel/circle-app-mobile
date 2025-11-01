@@ -154,7 +154,15 @@ class MediaUploadService {
           print("📌 Response status: ${response.statusCode}");
           if (response.statusCode == 200 || response.statusCode == 201) {
             print("✅ Successfully uploaded file ${index + 1}");
-            return file.copyWith(file: file.file, id: urlInfo['publicId']);
+            // Capture both secure_url and public_id from Cloudinary response
+            final cloudinaryUrl = response.data['secure_url'] as String;
+            final publicId = urlInfo['publicId'] as String;
+            return file.copyWith(
+              file: file.file, 
+              id: publicId,
+              url: cloudinaryUrl,
+              localPath: file.file.path  // Save the local compressed file path
+            );
           } else {
             print("⚠️ Upload failed with status ${response.statusCode}");
             print("⚠️ Response data: ${response.data}");
@@ -168,5 +176,58 @@ class MediaUploadService {
     );
 
     return uploadResults;
+  }
+
+  // Upload media files to Cloudinary and return URLs
+  Future<List<String>> uploadMediaToCloudinary(
+    List<MediaFile> mediaFiles,
+    List<dynamic> signedUrls,
+  ) async {
+    final uploadedUrls = <String>[];
+
+    for (int index = 0; index < mediaFiles.length; index++) {
+      final file = mediaFiles[index];
+      final urlInfo = signedUrls[index] as Map<String, dynamic>;
+
+      final isVideo = file.type == MediaType.video;
+      final uploadUrl =
+          "https://api.cloudinary.com/v1_1/${urlInfo['cloudName']}/${isVideo ? 'video' : 'image'}/upload";
+
+      final formData = FormData.fromMap({
+        'file': await MultipartFile.fromFile(file.file.path),
+        'api_key': urlInfo['apiKey'],
+        'timestamp': urlInfo['timestamp'],
+        'signature': urlInfo['signature'],
+        'folder': urlInfo['folder'],
+        'public_id': urlInfo['publicId'],
+        if (isVideo) 'resource_type': 'video',
+      });
+
+      final response = await _dio.post(
+        uploadUrl,
+        data: formData,
+        options: Options(
+          contentType: 'multipart/form-data',
+          validateStatus: (status) => status! < 500,
+        ),
+        onSendProgress: (sent, total) {
+          if (total != -1) {
+            final progress = (sent / total * 100).toStringAsFixed(0);
+            print("📤 Upload progress for file ${index + 1}: $progress%");
+            // You can emit this progress to a stream for UI updates
+          }
+        },
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final cloudinaryUrl = response.data['secure_url'] as String;
+        uploadedUrls.add(cloudinaryUrl);
+        print("✅ Successfully uploaded file ${index + 1}: $cloudinaryUrl");
+      } else {
+        throw Exception('Upload failed with status ${response.statusCode}');
+      }
+    }
+
+    return uploadedUrls;
   }
 }

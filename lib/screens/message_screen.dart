@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'package:chat/custom_ui/bottom_sheet.dart';
 import 'package:chat/custom_ui/message_bubble.dart';
 import 'package:chat/custom_ui/message_input.dart';
@@ -6,15 +5,14 @@ import 'package:chat/dtos/chat_dto.dart';
 import 'package:chat/database/db_modals/message_modal.dart';
 import 'package:chat/database/daos/message_dao.dart';
 import 'package:chat/provider/chat_provider.dart';
+import 'package:chat/provider/ws_provider.dart';
 import 'package:chat/screens/media_view.dart';
-import 'package:chat/services/message_serivce.dart';
-import 'package:chat/services/secure_store_service.dart';
 import 'package:chat/services/service_locator.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:chat/provider/ws_provider.dart';
+import 'package:chat/provider/message_provider.dart';
+import 'dart:async';
 
-// Changed to ConsumerStatefulWidget
 class MessageScreen extends ConsumerStatefulWidget {
   final ChatDto chatDto;
   const MessageScreen({super.key, required this.chatDto});
@@ -23,18 +21,17 @@ class MessageScreen extends ConsumerStatefulWidget {
   ConsumerState<MessageScreen> createState() => _MessageScreenState();
 }
 
-// Changed state to ConsumerState
 class _MessageScreenState extends ConsumerState<MessageScreen> {
   final TextEditingController _controller = TextEditingController();
   final ScrollController _scrollController = ScrollController();
-  final MessageService _messageService = getIt<MessageService>();
   final FocusNode _focusNode = FocusNode();
 
   bool _emojiShowing = false;
-  bool _showAttachmentSheet = false; 
+  bool _showAttachmentSheet = false;
 
   late final MessageDao _messageDao;
   late final Stream<List<MessageModal>> _messageStream;
+  StreamSubscription<List<MessageModal>>? _messageSubscription;
 
   @override
   void initState() {
@@ -43,7 +40,43 @@ class _MessageScreenState extends ConsumerState<MessageScreen> {
     _messageStream =
         _messageDao.watchMessages(widget.chatDto.id!).asBroadcastStream();
 
-    _messageDao.markMessagesAsRead(widget.chatDto.id!);
+    // Immediately mark all existing 'received' messages as 'read' when opening the chat
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      
+      // Mark all received messages as read
+      final receivedMessages = _messageDao.markMessagesAsRead(widget.chatDto.id!);
+      for (final message in receivedMessages) {
+        ref.read(webSocketProvider.notifier).sendStatusUpdate(message.messageId, 'read');
+      }
+      
+      print("✅ Marked ${receivedMessages.length} messages as read on screen open");
+    });
+
+    // Listen to message stream and auto-mark any new 'received' messages as 'read'
+    _messageSubscription = _messageStream.listen((messages) {
+      // Check if widget is still mounted before processing
+      if (!mounted) return;
+      
+      // Process only messages with 'received' status
+      for (final message in messages) {
+        if (message.status == 'received' && !message.fromMe && message.messageId != null) {
+          print("🔄 Auto-marking message as read: ${message.messageId}");
+          
+          // Mark as read locally
+          final messageEntity = _messageDao.getMessageByMessageId(message.messageId!);
+          if (messageEntity != null) {
+            messageEntity.status = 'read';
+            _messageDao.updateMessage(messageEntity);
+            
+            // Only send status update if still mounted
+            if (mounted) {
+              ref.read(webSocketProvider.notifier).sendStatusUpdate(message.messageId!, 'read');
+            }
+          }
+        }
+      }
+    });
 
     _focusNode.addListener(() {
       if (_focusNode.hasFocus) setState(() => _emojiShowing = false);
@@ -77,6 +110,7 @@ class _MessageScreenState extends ConsumerState<MessageScreen> {
       setState(() => _showAttachmentSheet = false);
       return;
     }
+    
     Navigator.pop(context);
   }
 
@@ -95,7 +129,8 @@ class _MessageScreenState extends ConsumerState<MessageScreen> {
   @override
   Widget build(BuildContext context) {
     final chatAsyncValue = ref.watch(selectedChatProvider(widget.chatDto.id!));
-    
+    final messageService = ref.watch(messageServiceProvider);
+
     return SafeArea(
       child: Scaffold(
         appBar: AppBar(
@@ -136,15 +171,27 @@ class _MessageScreenState extends ConsumerState<MessageScreen> {
                         itemCount: messages.length,
                         itemBuilder: (context, index) {
                           final message = messages[index];
-                          // ... (MessageBubble rendering logic)
                           return MessageBubble(
                             text: message.message,
-                            status:message.status,
+                            status: message.status,
                             mediaFiles: message.mediaFiles,
                             isMe: message.fromMe,
                             messageId: message.id,
                             timeStamp: message.timestamp,
                             onDelete: (id) => _messageDao.deleteMessage(id!),
+                            onRetry: () async {
+                              // Retry failed message
+                              print("🔄 Retrying message: ${message.messageId}");
+                              final result = await messageService.retryMessage(
+                                message,
+                                widget.chatDto,
+                              );
+                              if (result['success'] == true) {
+                                print("✅ Message retry successful");
+                              } else {
+                                print("❌ Message retry failed: ${result['error']}");
+                              }
+                            },
                             onMediaTap: (media) {
                               Navigator.push(
                                 context,
@@ -167,41 +214,23 @@ class _MessageScreenState extends ConsumerState<MessageScreen> {
                   emojiShowing: _emojiShowing,
                   toggleEmojiKeyboard: _toggleEmojiKeyboard,
                   toggleAttachmentSheet: _toggleAttachmentSheet,
-
                   onSend: (text) async {
                     if (text.trim().isEmpty) return;
 
-                    // 1. Prepare participant IDs and check for valid receiver
-                    final myPublicId =
-                        await SecureStoreService.getPublicUserId();
-                    final receiverPublicId = widget.chatDto.publicUserId;
-
-                    if (receiverPublicId == null) {
-                      print(
-                        "Error: Cannot send message, receiver ID is missing.",
-                      );
-                      return;
-                    }
-
-                    // 2. Save to local db and get the model
-                    final sentMessage = await _messageService.addMessageLocally(
+                    // Use the sendTextMessage method which has offline support
+                    final result = await messageService.sendTextMessage(
                       text,
                       widget.chatDto,
                     );
 
-                    // 3. Prepare and Send message DTO for WebSocket
-                    final outgoingPayload = _messageService.buildMessageDtoPayload(
-                      message: sentMessage,
-                      senderPublicId: myPublicId,
-                      chatId: widget.chatDto.id!,
-                      receiverPublicId: receiverPublicId,
-                      contentType: 'TEXT', // Set inner message type
-                    );
+                    if (result['success'] == true) {
+                      print("✅ Message sent/queued successfully");
+                    } else {
+                      print("❌ Failed to send message: ${result['error']}");
+                      // Message is still saved locally with 'failed' status
+                      // User can retry by tapping the error icon
+                    }
 
-                    final wsNotifier = ref.read(webSocketProvider.notifier);
-                    wsNotifier.send(jsonEncode(outgoingPayload));
-
-                    // Clear controller and scroll to bottom
                     _controller.clear();
                     _scrollToBottom();
                   },
@@ -216,7 +245,7 @@ class _MessageScreenState extends ConsumerState<MessageScreen> {
                 child: CustomBottomSheet.buildInlineSheet(
                   context,
                   (mediafiles) =>
-                      _messageService.handleMediaSelected(mediafiles, widget.chatDto),
+                      messageService.handleMediaSelected(mediafiles, widget.chatDto),
                 ),
               ),
           ],
@@ -227,9 +256,14 @@ class _MessageScreenState extends ConsumerState<MessageScreen> {
 
   @override
   void dispose() {
+    // Cancel message subscription
+    _messageSubscription?.cancel();
+    
+    // Dispose controllers
     _controller.dispose();
     _scrollController.dispose();
     _focusNode.dispose();
+    
     super.dispose();
   }
 }

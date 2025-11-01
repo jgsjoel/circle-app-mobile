@@ -6,7 +6,6 @@ import 'package:chat/database/daos/chat_participan_dao.dart';
 import 'package:chat/services/auth_service.dart';
 import 'package:chat/services/chat_service.dart';
 import 'package:chat/services/contact_service.dart';
-import 'package:chat/services/message_serivce.dart';
 import 'package:chat/services/profile_update_service.dart';
 import 'package:chat/services/secure_store_service.dart';
 import 'package:chat/services/webSock_service.dart';
@@ -43,7 +42,6 @@ Future<void> setupLocator() async {
 
   // Register services that depend on DAOs
   getIt.registerLazySingleton<ContactService>(() => ContactService());
-  getIt.registerLazySingleton<MessageService>(() => MessageService());
   getIt.registerLazySingleton<ChatService>(() => ChatService());
   getIt.registerLazySingleton<ProfileUpdateService>(() => ProfileUpdateService());
 }

@@ -17,9 +17,9 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
   @override
   void initState() {
     super.initState();
-    final type = _getMediaType(widget.media.url);
+    final type = _getMediaType(widget.media.source);
     if (type == "video") {
-      _videoController = VideoPlayerController.file(File(widget.media.url))
+      _videoController = VideoPlayerController.file(File(widget.media.source))
         ..initialize().then((_) {
           setState(() {});
           _videoController!.play();
@@ -43,13 +43,13 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final type = _getMediaType(widget.media.url);
+    final type = _getMediaType(widget.media.source);
 
     Widget body;
 
     switch (type) {
       case "image":
-        body = Center(child: Image.file(File(widget.media.url)));
+        body = Center(child: Image.file(File(widget.media.source)));
         break;
 
       case "video":

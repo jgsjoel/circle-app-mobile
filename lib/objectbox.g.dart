@@ -155,7 +155,7 @@ final _entities = <obx_int.ModelEntity>[
   obx_int.ModelEntity(
     id: const obx_int.IdUid(4, 2320339424421001160),
     name: 'MediaFileEntity',
-    lastPropertyId: const obx_int.IdUid(4, 7031969825949450486),
+    lastPropertyId: const obx_int.IdUid(5, 1644220215124370097),
     flags: 0,
     properties: <obx_int.ModelProperty>[
       obx_int.ModelProperty(
@@ -163,12 +163,6 @@ final _entities = <obx_int.ModelEntity>[
         name: 'id',
         type: 6,
         flags: 1,
-      ),
-      obx_int.ModelProperty(
-        id: const obx_int.IdUid(2, 8031176819481612680),
-        name: 'url',
-        type: 9,
-        flags: 0,
       ),
       obx_int.ModelProperty(
         id: const obx_int.IdUid(3, 7082336749780716486),
@@ -183,6 +177,12 @@ final _entities = <obx_int.ModelEntity>[
         flags: 520,
         indexId: const obx_int.IdUid(3, 5017988304020690068),
         relationTarget: 'MessageEntity',
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(5, 1644220215124370097),
+        name: 'source',
+        type: 9,
+        flags: 0,
       ),
     ],
     relations: <obx_int.ModelRelation>[],
@@ -300,7 +300,7 @@ obx_int.ModelDefinition getObjectBoxModel() {
     lastSequenceId: const obx_int.IdUid(0, 0),
     retiredEntityUids: const [],
     retiredIndexUids: const [],
-    retiredPropertyUids: const [],
+    retiredPropertyUids: const [8031176819481612680],
     retiredRelationUids: const [],
     modelVersion: 5,
     modelVersionParserMinimum: 5,
@@ -518,13 +518,13 @@ obx_int.ModelDefinition getObjectBoxModel() {
         object.id = id;
       },
       objectToFB: (MediaFileEntity object, fb.Builder fbb) {
-        final urlOffset = fbb.writeString(object.url);
         final publicIdOffset = fbb.writeString(object.publicId);
-        fbb.startTable(5);
+        final sourceOffset = fbb.writeString(object.source);
+        fbb.startTable(6);
         fbb.addInt64(0, object.id);
-        fbb.addOffset(1, urlOffset);
         fbb.addOffset(2, publicIdOffset);
         fbb.addInt64(3, object.message.targetId);
+        fbb.addOffset(4, sourceOffset);
         fbb.finish(fbb.endTable());
         return object.id;
       },
@@ -537,15 +537,15 @@ obx_int.ModelDefinition getObjectBoxModel() {
           4,
           0,
         );
-        final urlParam = const fb.StringReader(
+        final sourceParam = const fb.StringReader(
           asciiOptimization: true,
-        ).vTableGet(buffer, rootOffset, 6, '');
+        ).vTableGet(buffer, rootOffset, 12, '');
         final publicIdParam = const fb.StringReader(
           asciiOptimization: true,
         ).vTableGet(buffer, rootOffset, 8, '');
         final object = MediaFileEntity(
           id: idParam,
-          url: urlParam,
+          source: sourceParam,
           publicId: publicIdParam,
         );
         object.message.targetId = const fb.Int64Reader().vTableGet(
@@ -756,18 +756,18 @@ class MediaFileEntity_ {
     _entities[3].properties[0],
   );
 
-  /// See [MediaFileEntity.url].
-  static final url = obx.QueryStringProperty<MediaFileEntity>(
-    _entities[3].properties[1],
-  );
-
   /// See [MediaFileEntity.publicId].
   static final publicId = obx.QueryStringProperty<MediaFileEntity>(
-    _entities[3].properties[2],
+    _entities[3].properties[1],
   );
 
   /// See [MediaFileEntity.message].
   static final message = obx.QueryRelationToOne<MediaFileEntity, MessageEntity>(
+    _entities[3].properties[2],
+  );
+
+  /// See [MediaFileEntity.source].
+  static final source = obx.QueryStringProperty<MediaFileEntity>(
     _entities[3].properties[3],
   );
 }

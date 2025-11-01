@@ -103,7 +103,7 @@
     },
     {
       "id": "4:2320339424421001160",
-      "lastPropertyId": "4:7031969825949450486",
+      "lastPropertyId": "5:1644220215124370097",
       "name": "MediaFileEntity",
       "properties": [
         {
@@ -111,11 +111,6 @@
           "name": "id",
           "type": 6,
           "flags": 1
-        },
-        {
-          "id": "2:8031176819481612680",
-          "name": "url",
-          "type": 9
         },
         {
           "id": "3:7082336749780716486",
@@ -129,6 +124,11 @@
           "type": 11,
           "flags": 520,
           "relationTarget": "MessageEntity"
+        },
+        {
+          "id": "5:1644220215124370097",
+          "name": "source",
+          "type": 9
         }
       ],
       "relations": []
@@ -194,7 +194,9 @@
   "modelVersionParserMinimum": 5,
   "retiredEntityUids": [],
   "retiredIndexUids": [],
-  "retiredPropertyUids": [],
+  "retiredPropertyUids": [
+    8031176819481612680
+  ],
   "retiredRelationUids": [],
   "version": 1
 }

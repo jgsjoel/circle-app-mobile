@@ -2,13 +2,13 @@ import 'package:uuid/uuid.dart';
 
 class MediaFile {
   final String id;
-  final String url;
+  final String source;  // Local file path for sender, Cloudinary URL for receiver
   final String publicId;
   final int messageId; // FK to message.id
 
   MediaFile({
     String? id,
-    required this.url,
+    required this.source,
     required this.publicId,
     required this.messageId,
   }) : id = id ?? const Uuid().v4();
@@ -16,7 +16,7 @@ class MediaFile {
   Map<String, dynamic> toMap() {
     return {
       'id': id,
-      'url': url,
+      'source': source,
       'public_id': publicId,
       'message_id': messageId,
     };
@@ -25,7 +25,7 @@ class MediaFile {
   factory MediaFile.fromMap(Map<String, dynamic> map) {
     return MediaFile(
       id: map['id'],
-      url: map['url'],
+      source: map['source'],
       publicId: map['public_id'],
       messageId: map['message_id'],
     );

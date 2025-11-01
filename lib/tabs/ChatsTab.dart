@@ -25,6 +25,7 @@ class _ChatstabState extends State<Chatstab> {
   Widget build(BuildContext context) {
     return Scaffold(
       floatingActionButton: FloatingActionButton(
+        heroTag: 'chats_tab_fab',
         onPressed: () => Navigator.pushNamed(context, "/contacts"),
         child: Icon(Icons.chat),
       ),

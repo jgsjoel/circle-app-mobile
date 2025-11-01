@@ -5,14 +5,14 @@ import 'package:objectbox/objectbox.dart';
 class MediaFileEntity {
   int id;
 
-  String url;
+  String source;  // Local file path for sender, Cloudinary URL for receiver
   String publicId;
 
   final message = ToOne<MessageEntity>();
 
   MediaFileEntity({
     this.id = 0,
-    required this.url,
+    required this.source,
     required this.publicId,
   });
 }

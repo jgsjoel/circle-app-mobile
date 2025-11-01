@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:chat/database/entities/chat.dart';
 import 'package:chat/database/entities/chat_participant.dart';
+import 'package:chat/database/entities/contact.dart';
 import 'package:chat/database/entities/media_file.dart';
 import 'package:chat/database/entities/message.dart';
 import 'package:chat/dtos/incomming_messages.dart';
@@ -10,6 +12,7 @@ import 'package:chat/dtos/status_update_content.dart';
 import 'package:chat/services/secure_store_service.dart';
 import 'package:chat/services/service_locator.dart';
 import 'package:chat/services/webSock_service.dart';
+import 'package:chat/services/media_download_service.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:objectbox/objectbox.dart';
 import 'package:chat/objectbox.g.dart';
@@ -22,6 +25,7 @@ class WebSocketNotifier extends StateNotifier<WebSocketService?> {
   Box<ChatEntity> get _chatBox => _store.box<ChatEntity>();
   Box<MediaFileEntity> get _mediaFileBox => _store.box<MediaFileEntity>();
   Box<ChatParticipantEntity> get _participantBox => _store.box<ChatParticipantEntity>();
+  Box<ContactEntity> get _contactBox => _store.box<ContactEntity>();
 
   WebSocketNotifier(this.ref) : super(null);
 
@@ -43,6 +47,28 @@ class WebSocketNotifier extends StateNotifier<WebSocketService?> {
     _subscription?.cancel();
     state?.close();
     state = null;
+  }
+
+  // 📤 Send message status update to server
+  Future<void> sendStatusUpdate(String messageId, String status) async {
+    try {
+      final currentUserId = await SecureStoreService.getPublicUserId();
+      
+      final statusUpdate = {
+        "msg_type": "status",
+        "message": {
+          "message_id": messageId,
+          "updated_by_id": currentUserId,
+          "status": status,
+        }
+      };
+
+      final jsonString = jsonEncode(statusUpdate);
+      send(jsonString);
+      print("📤 Sent status update: $status for message: $messageId");
+    } catch (e) {
+      print("❌ Error sending status update: $e");
+    }
   }
 
   // 🔄 Handle incoming messages
@@ -71,10 +97,16 @@ class WebSocketNotifier extends StateNotifier<WebSocketService?> {
     final updates = incoming.content.whereType<StatusUpdateContent>().toList();
     
     for (final u in updates) {
-      final msg = _messageBox
-          .query(MessageEntity_.messageId.equals(u.messageId))
-          .build()
-          .findFirst();
+      final msg = (u.messageId != null && u.messageId.isNotEmpty)
+    ? _messageBox
+        .query(MessageEntity_.messageId.equals(u.messageId))
+        .build()
+        .findFirst()
+    : _messageBox
+        .query(MessageEntity_.msgPubId.equals(u.pubMsgId))
+        .build()
+        .findFirst();
+
           
       if (msg != null) {
         // Update message status and public ID
@@ -99,29 +131,44 @@ class WebSocketNotifier extends StateNotifier<WebSocketService?> {
   Future<void> _newSaveMessages(IncomingMessage incoming) async {
     final messages = incoming.content.whereType<MessageContent>().toList();
     final currentUserId = await SecureStoreService.getPublicUserId();
+    final mediaDownloadService = MediaDownloadService.instance;
 
     for (final content in messages) {
       try {
         final senderId = content.senderId;
 
+        // Create contact for unknown user if needed
+        await _ensureContactExists(senderId,content.senderMobile);
+
         // Find or create chat between users
         ChatEntity? chat = await _findChat(content.pubChatId);
         chat ??= await _createChat(senderId, currentUserId, content.pubChatId);
+
+        // Always mark incoming messages as "received" initially
+        // The message screen will upgrade to "read" if the user is viewing the chat
+        final messageStatus = "received";
+        print("➡️ Setting incoming message status to: $messageStatus for chat: ${chat.publicChatId}");
 
         // Create message
         final message = MessageEntity(
           messageId: content.messagePubId,
           message: content.message,
           fromMe: false,
-          status: "received",
+          status: messageStatus,
           timestamp: DateTime.now().millisecondsSinceEpoch,
         )..chat.target = chat;
 
-        // Create media files
+        // Create and download media files
         final mediaFiles = <MediaFileEntity>[];
         for (final media in content.mediaDtoList) {
+          // Download and cache the media file
+          final localPath = await mediaDownloadService.downloadAndCacheMedia(
+            media.url,
+            media.publicId,
+          );
+
           final mediaFile = MediaFileEntity(
-            url: media.url,
+            source: localPath ?? media.url,  // Use local path if downloaded, otherwise use URL
             publicId: media.publicId,
           )..message.target = message;
           mediaFiles.add(mediaFile);
@@ -141,9 +188,34 @@ class WebSocketNotifier extends StateNotifier<WebSocketService?> {
         chat.lastUpdated = DateTime.now();
         _chatBox.put(chat);
 
+        // Send "received" status update to server so sender sees double tick
+        await sendStatusUpdate(content.messagePubId, messageStatus);
+        print("✅ Message saved with status: $messageStatus");
+
       } catch (e, st) {
         print("❌ Error saving incoming message: $e\n$st");
       }
+    }
+  }
+
+  // 🆕 Ensure contact exists for the given public ID
+  Future<void> _ensureContactExists(String publicId,String phone) async {
+    // Check if contact already exists
+    final existingContact = _contactBox
+        .query(ContactEntity_.publicId.equals(publicId))
+        .build()
+        .findFirst();
+
+    if (existingContact == null) {
+      // Create a placeholder contact with public ID as name
+      final newContact = ContactEntity(
+        name: "${phone} (unknown)",  // Use public ID as temporary name
+        phone: phone,  // No phone number available
+        publicId: publicId,
+      );
+      
+      _contactBox.put(newContact);
+      print("✅ Created placeholder contact for unknown user: $publicId");
     }
   }
 
